@@ -285,12 +285,84 @@ const cityLabelOffsets: Record<string, Coordinate> = {
   深圳: [22, 8],
 };
 
+const cityEnglishNames: Record<string, string> = {
+  北京: "BEIJING",
+  天津: "TIANJIN",
+  上海: "SHANGHAI",
+  重庆: "CHONGQING",
+  南京: "NANJING",
+  苏州: "SUZHOU",
+  常州: "CHANGZHOU",
+  无锡: "WUXI",
+  扬州: "YANGZHOU",
+  徐州: "XUZHOU",
+  杭州: "HANGZHOU",
+  宁波: "NINGBO",
+  温州: "WENZHOU",
+  广州: "GUANGZHOU",
+  深圳: "SHENZHEN",
+  佛山: "FOSHAN",
+  珠海: "ZHUHAI",
+  成都: "CHENGDU",
+  武汉: "WUHAN",
+  长沙: "CHANGSHA",
+  西安: "XI'AN",
+  郑州: "ZHENGZHOU",
+  济南: "JINAN",
+  青岛: "QINGDAO",
+  合肥: "HEFEI",
+  福州: "FUZHOU",
+  厦门: "XIAMEN",
+  南昌: "NANCHANG",
+  沈阳: "SHENYANG",
+  大连: "DALIAN",
+  长春: "CHANGCHUN",
+  哈尔滨: "HARBIN",
+  昆明: "KUNMING",
+  贵阳: "GUIYANG",
+  南宁: "NANNING",
+  海口: "HAIKOU",
+  三亚: "SANYA",
+  石家庄: "SHIJIAZHUANG",
+  太原: "TAIYUAN",
+  呼和浩特: "HOHHOT",
+  兰州: "LANZHOU",
+  西宁: "XINING",
+  银川: "YINCHUAN",
+  乌鲁木齐: "URUMQI",
+  拉萨: "LHASA",
+  台北: "TAIPEI",
+  香港: "HONG KONG",
+  澳门: "MACAU",
+};
+
 function normalizeCityName(city: string) {
   return city.trim().replace(/[市区县]$/, "");
 }
 
 function cityMetaOf(city: string) {
   return cityMapMeta[normalizeCityName(city)];
+}
+
+function cityEnglishName(city: string) {
+  return cityEnglishNames[normalizeCityName(city)] ?? "CITY";
+}
+
+function formatCapsuleDate(date: string) {
+  return date.replaceAll("-", ".");
+}
+
+function cityMemoryExcerpt(record?: DemoPerformance) {
+  if (!record) return "";
+  const note = record.note.replace(/\s+/g, " ").trim();
+  const source = note && !note.includes("保存在当前浏览器里的 Demo 记录") ? note : record.line.trim();
+  if (!source) return "这座城市的声音，等下一场演出来补上。";
+  const punctuation = ["。", "！", "？", "!", "?"]
+    .map((mark) => source.indexOf(mark))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0];
+  const excerpt = punctuation === undefined ? source : source.slice(0, punctuation + 1);
+  return excerpt.length > 64 ? excerpt.slice(0, 64).trimEnd() + "…" : excerpt;
 }
 
 function projectChinaPoint([longitude, latitude]: Coordinate): Coordinate {
@@ -621,6 +693,19 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
   const cities = useMemo(() => Object.keys(filteredCityGroups), [filteredCityGroups]);
   const [activeCity, setActiveCity] = useState(cities[0] ?? "");
   const activeRecords = filteredCityGroups[activeCity] ?? [];
+  const chronologicalActiveRecords = [...activeRecords].sort((a, b) => a.date.localeCompare(b.date));
+  const firstVisit = chronologicalActiveRecords[0];
+  const lastVisit = chronologicalActiveRecords[chronologicalActiveRecords.length - 1];
+  const latestCityRecord = lastVisit;
+  const cityVenueCount = new Set(activeRecords.map((record) => record.venue.trim()).filter(Boolean)).size;
+  const cityArtistCount = new Set(
+    activeRecords.flatMap((record) => record.artist.split(/\s*(?:\/|、|,|，|&)\s*/).filter(Boolean)),
+  ).size;
+  const cityMemory = cityMemoryExcerpt(latestCityRecord);
+  const cityPhoto = [...chronologicalActiveRecords]
+    .reverse()
+    .flatMap((record) => [...record.timeline].reverse().map((item) => item.image).filter((image): image is string => Boolean(image)))
+    .find(Boolean) ?? latestCityRecord?.media[0] ?? latestCityRecord?.cover;
 
   const provinceCounts = useMemo(() => {
     return filteredRecords.reduce<Record<string, number>>((counts, record) => {
@@ -773,14 +858,42 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
           </div>
         </div>
 
-        <aside className="border-t border-zinc-200 bg-white/90 lg:border-l lg:border-t-0">
+        <aside className="border-t border-zinc-200 bg-white/90 lg:max-h-[620px] lg:overflow-y-auto lg:border-l lg:border-t-0">
           <div className="border-b border-zinc-200 p-6">
-            <p className="text-xs uppercase tracking-[0.18em] text-[#a44b32]">Selected city</p>
-            <h2 className="mt-2 text-4xl font-black">{activeCity || "暂无城市"}</h2>
-            <p className="mt-2 text-sm text-zinc-500">{activeRecords.length} 场演出记忆{year === "all" ? "" : ` · ${year}`}</p>
+            <h2 className="text-[clamp(28px,3vw,40px)] font-black leading-none tracking-[-0.04em]">
+              {activeCity ? <><span>{cityEnglishName(activeCity)}</span><span className="text-zinc-300"> / </span><span>{activeCity}</span></> : "暂无城市"}
+            </h2>
+            {firstVisit ? <p className="mt-4 text-sm leading-6 text-zinc-600">{formatCapsuleDate(firstVisit.date)} — 第一次为音乐来到这里</p> : null}
+            {activeRecords.length ? (
+              <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-zinc-500">
+                {String(activeRecords.length).padStart(2, "0")} 场演出 · {String(cityVenueCount).padStart(2, "0")} 个场地 · {String(cityArtistCount).padStart(2, "0")} 位艺人
+              </p>
+            ) : null}
+            {activeRecords.length > 1 && firstVisit && lastVisit ? (
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-zinc-200 pt-4">
+                <span><span className="block text-[10px] font-bold tracking-[0.16em] text-[#a44b32]">FIRST VISIT</span><span className="mt-1 block text-xs text-zinc-600">{formatCapsuleDate(firstVisit.date)}</span></span>
+                <span><span className="block text-[10px] font-bold tracking-[0.16em] text-[#a44b32]">LAST VISIT</span><span className="mt-1 block text-xs text-zinc-600">{formatCapsuleDate(lastVisit.date)}</span></span>
+              </div>
+            ) : null}
           </div>
-          <div className="grid max-h-[480px] gap-3 overflow-auto p-4 lg:max-h-[510px]">
-            {activeRecords.map((record) => (
+
+          {cityPhoto ? (
+            <div className="mx-4 mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={cityPhoto} alt={activeCity + "城市记忆"} className="aspect-[16/9] w-full object-cover" />
+            </div>
+          ) : null}
+
+          {cityMemory ? (
+            <div className="mx-4 mt-4 rounded-2xl bg-[#f5f1e9] p-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#a44b32]">City memory</p>
+              <blockquote className="mt-3 text-[15px] font-medium leading-7 text-zinc-800">「{cityMemory}」</blockquote>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 p-4">
+            {activeRecords.length ? <p className="px-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Live archive · {String(activeRecords.length).padStart(2, "0")}</p> : null}
+            {[...activeRecords].sort((a, b) => b.date.localeCompare(a.date)).map((record) => (
               <button key={record.id} onClick={() => onSelect(record)} className="grid grid-cols-[82px_1fr] gap-3 rounded-xl border border-zinc-200 bg-white p-2 text-left transition hover:border-zinc-300 hover:bg-zinc-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={record.cover} alt="" className="h-24 w-[82px] rounded-lg object-cover" />
