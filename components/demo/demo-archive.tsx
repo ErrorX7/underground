@@ -224,7 +224,6 @@ const MAP_WIDTH = 760;
 const MAP_HEIGHT = 540;
 const chinaFeatures = (chinaGeo as unknown as { features: ChinaFeature[] }).features;
 const provinceFeatures = chinaFeatures.filter((feature) => typeof feature.properties.adcode === "number");
-const southChinaSeaFeature = chinaFeatures.find((feature) => feature.properties.adcode === "100000_JD");
 
 const cityMapMeta: Record<string, CityMapMeta> = {
   北京: { province: "北京市", coordinate: [116.4074, 39.9042] },
@@ -306,14 +305,6 @@ function projectChinaPoint([longitude, latitude]: Coordinate): Coordinate {
   ];
 }
 
-function projectInsetPoint([longitude, latitude]: Coordinate): Coordinate {
-  const padding = 5;
-  return [
-    padding + ((longitude - 107.5) / 16) * (104 - padding * 2),
-    padding + ((25 - latitude) / 23) * (128 - padding * 2),
-  ];
-}
-
 function geometryToPath(geometry: GeoGeometry, project: (coordinate: Coordinate) => Coordinate) {
   const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
   return polygons
@@ -334,10 +325,6 @@ const provincePathData = provinceFeatures.map((feature) => ({
   name: feature.properties.name,
   d: geometryToPath(feature.geometry, projectChinaPoint),
 }));
-const southChinaSeaPath = southChinaSeaFeature
-  ? geometryToPath(southChinaSeaFeature.geometry, projectInsetPoint)
-  : "";
-
 function provinceHeatColor(count: number) {
   if (count >= 7) return "#7c2d1d";
   if (count >= 4) return "#aa5138";
@@ -778,12 +765,6 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
                 );
               })}
 
-              {southChinaSeaPath ? (
-                <g transform={`translate(${MAP_WIDTH - 120} ${MAP_HEIGHT - 144})`}>
-                  <rect width="110" height="136" rx="10" fill="rgba(255,255,255,0.72)" stroke="#d4d4d8" />
-                  <path d={southChinaSeaPath} fill="rgba(234,208,196,0.35)" stroke="#a8a29e" strokeWidth="0.8" />
-                </g>
-              ) : null}
             </svg>
 
             <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 text-[10px] font-medium text-zinc-500 shadow-sm backdrop-blur-xl">
