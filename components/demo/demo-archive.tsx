@@ -860,7 +860,7 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
 
         <aside className="border-t border-zinc-200 bg-white/90 lg:max-h-[620px] lg:overflow-y-auto lg:border-l lg:border-t-0">
           <div className="border-b border-zinc-200 p-6">
-            <h2 className="text-[clamp(28px,3vw,40px)] font-black leading-none tracking-[-0.04em]">
+            <h2 className="whitespace-nowrap text-[clamp(22px,2.2vw,34px)] font-black leading-none tracking-[-0.04em]">
               {activeCity ? <><span>{cityEnglishName(activeCity)}</span><span className="text-zinc-300"> / </span><span>{activeCity}</span></> : "暂无城市"}
             </h2>
             {firstVisit ? <p className="mt-4 text-sm leading-6 text-zinc-600">{formatCapsuleDate(firstVisit.date)} — 第一次为音乐来到这里</p> : null}
