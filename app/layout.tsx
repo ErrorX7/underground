@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Stage Archive",
+  title: "Underground",
   description: "个人演出档案馆",
 };
 
