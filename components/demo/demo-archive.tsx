@@ -18,6 +18,7 @@ import {
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type PerformanceType = "livehouse" | "bar" | "arena";
+type TicketMethod = "official" | "proxy" | "resale" | "scalper" | "gift" | "other";
 type ViewMode = "archive" | "map";
 
 type DemoPerformance = {
@@ -31,6 +32,9 @@ type DemoPerformance = {
   venue: string;
   type: PerformanceType;
   price: number;
+  ticketMethod?: TicketMethod;
+  actualPrice?: number;
+  ticketSource?: string;
   cover: string;
   line: string;
   note: string;
@@ -192,6 +196,15 @@ const typeLabels: Record<PerformanceType, string> = {
   arena: "体育馆",
 };
 
+const ticketMethodLabels: Record<TicketMethod, string> = {
+  official: "官方购票",
+  proxy: "代拍",
+  resale: "二手转票",
+  scalper: "黄牛收票",
+  gift: "赠票",
+  other: "其他方式",
+};
+
 const emojiOptions = ["", "🎟️", "✨", "🎤", "📸", "🚆", "🍜", "💭", "❤️", "😭", "🔥", "🌙"];
 
 const cityPositions: Record<string, { left: string; top: string }> = {
@@ -202,6 +215,17 @@ const cityPositions: Record<string, { left: string; top: string }> = {
   常州: { left: "72%", top: "56%" },
   成都: { left: "43%", top: "62%" },
 };
+
+function optionalAmount(form: FormData, name: string) {
+  const raw = String(form.get(name) ?? "").trim();
+  if (!raw) return undefined;
+  const amount = Number(raw);
+  return Number.isFinite(amount) ? amount : undefined;
+}
+
+function formatMoney(amount: number) {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2).replace(/\.00$/, "");
+}
 
 function formatDate(date: string) {
   return new Date(date + "T00:00:00").toLocaleDateString("zh-CN", {
@@ -281,7 +305,10 @@ export function DemoArchive({ initialView = "archive" }: { initialView?: ViewMod
       city: String(form.get("city") ?? "").trim(),
       venue: String(form.get("venue") ?? "").trim(),
       type: String(form.get("type") ?? "livehouse") as PerformanceType,
-      price: Number(form.get("price")) || 0,
+      price: optionalAmount(form, "price") ?? 0,
+      ticketMethod: (String(form.get("ticketMethod") ?? "") || undefined) as TicketMethod | undefined,
+      actualPrice: optionalAmount(form, "actualPrice"),
+      ticketSource: String(form.get("ticketSource") ?? "").trim(),
       cover,
       line: String(form.get("line") ?? "").trim(),
       note: "这是一条保存在当前浏览器里的 Demo 记录。打开详情后可以继续修改观后记。",
@@ -591,8 +618,9 @@ function CreateModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (ev
           <Field label="时间" name="time" type="time" />
           <Field label="城市" name="city" required />
           <Field label="场馆" name="venue" required />
-          <Field label="票价" name="price" type="number" min="0" />
+          <Field label="票面价" name="price" type="number" min="0" step="0.01" placeholder="官方售卖价格" />
           <label className="grid gap-2 text-sm font-medium text-zinc-700">演出类型<select name="type" className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-950"><option value="livehouse">Livehouse</option><option value="bar">酒吧商演</option><option value="arena">体育馆</option></select></label>
+          <TicketPurchaseFields />
 
           <div className="grid gap-3 md:col-span-2 md:grid-cols-[1fr_220px]">
             <label className="group grid min-h-44 cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-zinc-300 bg-[#faf9f6] p-5 text-center transition hover:border-[#a44b32] hover:bg-orange-50/50">
@@ -672,7 +700,10 @@ function DetailModal({
       city: String(form.get("city") ?? "").trim(),
       venue: String(form.get("venue") ?? "").trim(),
       type: String(form.get("type") ?? "livehouse") as PerformanceType,
-      price: Number(form.get("price")) || 0,
+      price: optionalAmount(form, "price") ?? 0,
+      ticketMethod: (String(form.get("ticketMethod") ?? "") || undefined) as TicketMethod | undefined,
+      actualPrice: optionalAmount(form, "actualPrice"),
+      ticketSource: String(form.get("ticketSource") ?? "").trim(),
       line: String(form.get("line") ?? "").trim(),
       cover: coverDraft,
     });
@@ -753,8 +784,9 @@ function DetailModal({
               <Field label="时间" name="time" type="time" defaultValue={record.time} />
               <Field label="城市" name="city" defaultValue={record.city} required />
               <Field label="场馆" name="venue" defaultValue={record.venue} required />
-              <Field label="票价" name="price" type="number" min="0" defaultValue={record.price} />
+              <Field label="票面价" name="price" type="number" min="0" step="0.01" defaultValue={record.price || undefined} placeholder="官方售卖价格" />
               <label className="grid gap-2 text-sm font-medium text-zinc-700">演出类型<select name="type" defaultValue={record.type} className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-950"><option value="livehouse">Livehouse</option><option value="bar">酒吧商演</option><option value="arena">体育馆</option></select></label>
+              <TicketPurchaseFields record={record} />
               <label className="grid gap-2 text-sm font-medium text-zinc-700 md:col-span-2">一句话记录<textarea name="line" defaultValue={record.line} className="min-h-24 rounded-xl border border-zinc-300 bg-white px-3 py-3 text-zinc-950 outline-none focus:border-zinc-950" /></label>
               <div className="grid gap-3 md:col-span-2 md:grid-cols-[1fr_220px]">
                 <label className="grid min-h-36 cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-zinc-300 bg-[#faf9f6] p-5 text-center transition hover:border-[#a44b32]">
@@ -779,7 +811,7 @@ function DetailModal({
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Ticket information</p>
             <Info icon={<CalendarDays className="h-4 w-4" />} label="日期" value={formatDate(record.date)} />
             <Info icon={<MapPin className="h-4 w-4" />} label="地点" value={record.city + " · " + record.venue} />
-            <Info icon={<Ticket className="h-4 w-4" />} label="票价" value={record.price ? "¥" + record.price : "未记录"} />
+            <Info icon={<Ticket className="h-4 w-4" />} label="票务" value={<TicketSummary record={record} />} />
           </aside>
 
           <div className="grid gap-6">
@@ -869,6 +901,54 @@ function DetailModal({
   );
 }
 
-function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="mt-5 flex gap-3 border-t border-zinc-200 pt-5 text-sm"><span className="mt-0.5 text-[#a44b32]">{icon}</span><span><span className="block text-xs text-zinc-500">{label}</span><strong className="mt-1 block font-medium text-zinc-700">{value}</strong></span></div>;
+function TicketPurchaseFields({ record }: { record?: DemoPerformance }) {
+  return (
+    <>
+      <label className="grid gap-2 text-sm font-medium text-zinc-700">
+        入手方式
+        <select name="ticketMethod" defaultValue={record?.ticketMethod ?? ""} className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-950">
+          <option value="">暂不记录</option>
+          <option value="official">官方购票</option>
+          <option value="proxy">代拍</option>
+          <option value="resale">二手转票</option>
+          <option value="scalper">黄牛收票</option>
+          <option value="gift">赠票</option>
+          <option value="other">其他方式</option>
+        </select>
+      </label>
+      <Field label="实际花费" name="actualPrice" type="number" min="0" step="0.01" defaultValue={record?.actualPrice} placeholder="含手续费、代拍费或加价" />
+      <details defaultOpen={Boolean(record?.ticketSource)} className="group rounded-xl border border-zinc-200 bg-[#faf9f6] md:col-span-2">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-zinc-700">
+          <span className="inline-flex items-center gap-2">补充购票来源 <span className="text-xs font-normal text-zinc-400">选填</span><span className="text-zinc-400 transition group-open:rotate-45">＋</span></span>
+        </summary>
+        <label className="grid gap-2 border-t border-zinc-200 px-4 py-4 text-sm font-medium text-zinc-700">
+          渠道 / 来源
+          <input name="ticketSource" defaultValue={record?.ticketSource ?? ""} className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950" placeholder="如：大麦、闲鱼、票务群、朋友转票" />
+        </label>
+      </details>
+    </>
+  );
+}
+
+function TicketSummary({ record }: { record: DemoPerformance }) {
+  const faceValue = record.price ? `¥${formatMoney(record.price)}` : "票面价未记录";
+  const method = record.ticketMethod ? ticketMethodLabels[record.ticketMethod] : "";
+  const source = record.ticketSource?.trim() ?? "";
+  const actualPrice = record.actualPrice;
+  const details = [method, source].filter(Boolean);
+
+  if (record.ticketMethod !== "gift" && actualPrice !== undefined && !(record.ticketMethod === "official" && actualPrice === record.price)) {
+    details.push(`实付 ¥${formatMoney(actualPrice)}`);
+  }
+
+  return (
+    <span className="block">
+      <span className="block text-base font-bold text-zinc-800">{faceValue}</span>
+      {details.length ? <span className="mt-1 block text-xs font-medium leading-5 text-zinc-500">{details.join(" · ")}</span> : null}
+    </span>
+  );
+}
+
+function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return <div className="mt-5 flex gap-3 border-t border-zinc-200 pt-5 text-sm"><span className="mt-0.5 text-[#a44b32]">{icon}</span><span className="min-w-0"><span className="block text-xs text-zinc-500">{label}</span><span className="mt-1 block font-medium text-zinc-700">{value}</span></span></div>;
 }
