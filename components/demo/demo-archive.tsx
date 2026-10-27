@@ -10,12 +10,14 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Route,
   Search,
   Ticket,
   Trash2,
   X,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import chinaGeo from "@/data/china-geo.json";
 
 type PerformanceType = "livehouse" | "bar" | "arena";
 type TicketMethod = "official" | "proxy" | "resale" | "scalper" | "gift" | "other";
@@ -207,14 +209,133 @@ const ticketMethodLabels: Record<TicketMethod, string> = {
 
 const emojiOptions = ["", "🎟️", "✨", "🎤", "📸", "🚆", "🍜", "💭", "❤️", "😭", "🔥", "🌙"];
 
-const cityPositions: Record<string, { left: string; top: string }> = {
-  北京: { left: "63%", top: "30%" },
-  上海: { left: "76%", top: "57%" },
-  南京: { left: "70%", top: "54%" },
-  杭州: { left: "73%", top: "61%" },
-  常州: { left: "72%", top: "56%" },
-  成都: { left: "43%", top: "62%" },
+type Coordinate = [number, number];
+type GeoGeometry =
+  | { type: "Polygon"; coordinates: Coordinate[][] }
+  | { type: "MultiPolygon"; coordinates: Coordinate[][][] };
+type ChinaFeature = {
+  type: "Feature";
+  properties: { adcode: number | string; name: string };
+  geometry: GeoGeometry;
 };
+type CityMapMeta = { province: string; coordinate: Coordinate };
+
+const MAP_WIDTH = 760;
+const MAP_HEIGHT = 540;
+const chinaFeatures = (chinaGeo as unknown as { features: ChinaFeature[] }).features;
+const provinceFeatures = chinaFeatures.filter((feature) => typeof feature.properties.adcode === "number");
+const southChinaSeaFeature = chinaFeatures.find((feature) => feature.properties.adcode === "100000_JD");
+
+const cityMapMeta: Record<string, CityMapMeta> = {
+  北京: { province: "北京市", coordinate: [116.4074, 39.9042] },
+  天津: { province: "天津市", coordinate: [117.2009, 39.0842] },
+  上海: { province: "上海市", coordinate: [121.4737, 31.2304] },
+  重庆: { province: "重庆市", coordinate: [106.5516, 29.563] },
+  南京: { province: "江苏省", coordinate: [118.7969, 32.0603] },
+  苏州: { province: "江苏省", coordinate: [120.5853, 31.2989] },
+  常州: { province: "江苏省", coordinate: [119.9741, 31.8112] },
+  无锡: { province: "江苏省", coordinate: [120.3119, 31.4912] },
+  扬州: { province: "江苏省", coordinate: [119.421, 32.3932] },
+  徐州: { province: "江苏省", coordinate: [117.2841, 34.2058] },
+  杭州: { province: "浙江省", coordinate: [120.1551, 30.2741] },
+  宁波: { province: "浙江省", coordinate: [121.5503, 29.8746] },
+  温州: { province: "浙江省", coordinate: [120.6994, 27.9943] },
+  广州: { province: "广东省", coordinate: [113.2644, 23.1291] },
+  深圳: { province: "广东省", coordinate: [114.0579, 22.5431] },
+  佛山: { province: "广东省", coordinate: [113.1214, 23.0215] },
+  珠海: { province: "广东省", coordinate: [113.5767, 22.2707] },
+  成都: { province: "四川省", coordinate: [104.0665, 30.5728] },
+  武汉: { province: "湖北省", coordinate: [114.3054, 30.5931] },
+  长沙: { province: "湖南省", coordinate: [112.9388, 28.2282] },
+  西安: { province: "陕西省", coordinate: [108.9398, 34.3416] },
+  郑州: { province: "河南省", coordinate: [113.6254, 34.7466] },
+  济南: { province: "山东省", coordinate: [117.1205, 36.6512] },
+  青岛: { province: "山东省", coordinate: [120.3826, 36.0671] },
+  合肥: { province: "安徽省", coordinate: [117.2272, 31.8206] },
+  福州: { province: "福建省", coordinate: [119.2965, 26.0745] },
+  厦门: { province: "福建省", coordinate: [118.0894, 24.4798] },
+  南昌: { province: "江西省", coordinate: [115.8582, 28.6829] },
+  沈阳: { province: "辽宁省", coordinate: [123.4315, 41.8057] },
+  大连: { province: "辽宁省", coordinate: [121.6147, 38.914] },
+  长春: { province: "吉林省", coordinate: [125.3235, 43.8171] },
+  哈尔滨: { province: "黑龙江省", coordinate: [126.5349, 45.8038] },
+  昆明: { province: "云南省", coordinate: [102.8329, 24.8801] },
+  贵阳: { province: "贵州省", coordinate: [106.6302, 26.647] },
+  南宁: { province: "广西壮族自治区", coordinate: [108.3665, 22.817] },
+  海口: { province: "海南省", coordinate: [110.1983, 20.044] },
+  三亚: { province: "海南省", coordinate: [109.5119, 18.2528] },
+  石家庄: { province: "河北省", coordinate: [114.5149, 38.0428] },
+  太原: { province: "山西省", coordinate: [112.5489, 37.8706] },
+  呼和浩特: { province: "内蒙古自治区", coordinate: [111.7492, 40.8426] },
+  兰州: { province: "甘肃省", coordinate: [103.8343, 36.0611] },
+  西宁: { province: "青海省", coordinate: [101.7782, 36.6171] },
+  银川: { province: "宁夏回族自治区", coordinate: [106.2309, 38.4872] },
+  乌鲁木齐: { province: "新疆维吾尔自治区", coordinate: [87.6168, 43.8256] },
+  拉萨: { province: "西藏自治区", coordinate: [91.1409, 29.6456] },
+  台北: { province: "台湾省", coordinate: [121.5654, 25.033] },
+  香港: { province: "香港特别行政区", coordinate: [114.1694, 22.3193] },
+  澳门: { province: "澳门特别行政区", coordinate: [113.5439, 22.1987] },
+};
+
+function normalizeCityName(city: string) {
+  return city.trim().replace(/[市区县]$/, "");
+}
+
+function cityMetaOf(city: string) {
+  return cityMapMeta[normalizeCityName(city)];
+}
+
+function projectChinaPoint([longitude, latitude]: Coordinate): Coordinate {
+  const padding = 24;
+  const minLongitude = 72;
+  const maxLongitude = 136;
+  const minLatitude = 16;
+  const maxLatitude = 54.5;
+  return [
+    padding + ((longitude - minLongitude) / (maxLongitude - minLongitude)) * (MAP_WIDTH - padding * 2),
+    padding + ((maxLatitude - latitude) / (maxLatitude - minLatitude)) * (MAP_HEIGHT - padding * 2),
+  ];
+}
+
+function projectInsetPoint([longitude, latitude]: Coordinate): Coordinate {
+  const padding = 5;
+  return [
+    padding + ((longitude - 107.5) / 16) * (104 - padding * 2),
+    padding + ((25 - latitude) / 23) * (128 - padding * 2),
+  ];
+}
+
+function geometryToPath(geometry: GeoGeometry, project: (coordinate: Coordinate) => Coordinate) {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  return polygons
+    .flatMap((polygon) =>
+      polygon.map((ring) =>
+        ring
+          .map((coordinate, index) => {
+            const [x, y] = project(coordinate);
+            return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+          })
+          .join(" ") + " Z",
+      ),
+    )
+    .join(" ");
+}
+
+const provincePathData = provinceFeatures.map((feature) => ({
+  name: feature.properties.name,
+  d: geometryToPath(feature.geometry, projectChinaPoint),
+}));
+const southChinaSeaPath = southChinaSeaFeature
+  ? geometryToPath(southChinaSeaFeature.geometry, projectInsetPoint)
+  : "";
+
+function provinceHeatColor(count: number) {
+  if (count >= 7) return "#7c2d1d";
+  if (count >= 4) return "#aa5138";
+  if (count >= 2) return "#d28a70";
+  if (count >= 1) return "#ead0c4";
+  return "#eeeae2";
+}
 
 function optionalAmount(form: FormData, name: string) {
   const raw = String(form.get(name) ?? "").trim();
@@ -484,45 +605,191 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerformance[]>; onSelect: (record: DemoPerformance) => void }) {
-  const cities = Object.keys(cityGroups);
+  const allRecords = useMemo(() => Object.values(cityGroups).flat(), [cityGroups]);
+  const years = useMemo(
+    () => Array.from(new Set(allRecords.map((record) => record.date.slice(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a)),
+    [allRecords],
+  );
+  const [year, setYear] = useState("all");
+  const [showRoute, setShowRoute] = useState(false);
+  const filteredRecords = useMemo(
+    () => year === "all" ? allRecords : allRecords.filter((record) => record.date.startsWith(year)),
+    [allRecords, year],
+  );
+  const filteredCityGroups = useMemo(() => {
+    return filteredRecords.reduce<Record<string, DemoPerformance[]>>((groups, record) => {
+      groups[record.city] = [...(groups[record.city] ?? []), record];
+      return groups;
+    }, {});
+  }, [filteredRecords]);
+  const cities = useMemo(() => Object.keys(filteredCityGroups), [filteredCityGroups]);
   const [activeCity, setActiveCity] = useState(cities[0] ?? "");
-  const activeRecords = cityGroups[activeCity] ?? [];
+  const activeRecords = filteredCityGroups[activeCity] ?? [];
+
+  const provinceCounts = useMemo(() => {
+    return filteredRecords.reduce<Record<string, number>>((counts, record) => {
+      const province = cityMetaOf(record.city)?.province;
+      if (province) counts[province] = (counts[province] ?? 0) + 1;
+      return counts;
+    }, {});
+  }, [filteredRecords]);
+
+  const mappedCities = useMemo(() => {
+    return cities
+      .map((city) => {
+        const meta = cityMetaOf(city);
+        if (!meta) return null;
+        const [x, y] = projectChinaPoint(meta.coordinate);
+        return { city, x, y, count: filteredCityGroups[city].length, province: meta.province };
+      })
+      .filter((item): item is { city: string; x: number; y: number; count: number; province: string } => Boolean(item));
+  }, [cities, filteredCityGroups]);
+
+  const routeStops = useMemo(() => {
+    const stops: { city: string; x: number; y: number }[] = [];
+    [...filteredRecords]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach((record) => {
+        const meta = cityMetaOf(record.city);
+        if (!meta) return;
+        const [x, y] = projectChinaPoint(meta.coordinate);
+        const previous = stops[stops.length - 1];
+        if (!previous || previous.city !== record.city) stops.push({ city: record.city, x, y });
+      });
+    return stops;
+  }, [filteredRecords]);
+
+  const latestMappedCity = useMemo(() => {
+    return [...filteredRecords]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .find((record) => cityMetaOf(record.city))?.city;
+  }, [filteredRecords]);
 
   useEffect(() => {
-    if (!cityGroups[activeCity] && cities[0]) setActiveCity(cities[0]);
-  }, [activeCity, cities, cityGroups]);
+    if (!filteredCityGroups[activeCity]) setActiveCity(cities[0] ?? "");
+  }, [activeCity, cities, filteredCityGroups]);
 
   return (
     <section className="page-in">
       <div className="mb-8">
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#a44b32]">Map memory</p>
-        <h1 className="max-w-4xl text-[clamp(42px,6vw,82px)] font-black leading-[0.9] tracking-[-0.05em]">城市不是地点，是现场被点亮的位置。</h1>
+        <h1 className="max-w-4xl text-[clamp(42px,6vw,82px)] font-black leading-[0.9] tracking-[-0.05em]">去过的地方，会在地图上慢慢变深。</h1>
+        <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-600">省份颜色记录演出密度；打开足迹路线，就能看见一次次出发如何连成自己的巡演地图。</p>
       </div>
+
       <div className="grid overflow-hidden rounded-[24px] border border-zinc-200 bg-white lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="relative min-h-[620px] overflow-hidden bg-[radial-gradient(circle_at_58%_55%,rgba(216,102,69,0.12),transparent_22rem),linear-gradient(140deg,#fff,#f4f1e9)]">
-          <div className="absolute inset-[12%_8%_10%_5%] border border-stone-300 bg-[linear-gradient(135deg,rgba(168,142,105,0.14),rgba(255,255,255,0.35)),repeating-linear-gradient(0deg,rgba(63,63,70,0.055)_0_1px,transparent_1px_34px),repeating-linear-gradient(90deg,rgba(63,63,70,0.045)_0_1px,transparent_1px_42px)] [clip-path:polygon(22%_18%,36%_9%,52%_13%,66%_9%,78%_22%,87%_38%,82%_52%,91%_64%,78%_77%,62%_72%,52%_86%,39%_74%,24%_80%,16%_65%,7%_58%,13%_43%,7%_31%)]" />
-          {cities.map((city) => {
-            const position = cityPositions[city] ?? { left: "50%", top: "50%" };
-            const active = city === activeCity;
-            return (
-              <button
-                key={city}
-                onClick={() => setActiveCity(city)}
-                style={position}
-                className="absolute z-10 -translate-x-1/2 -translate-y-1/2 text-center"
-              >
-                <span className={`mx-auto block h-3 w-3 rounded-full border-2 border-white/80 bg-zinc-950 transition ${active ? "scale-125 shadow-[0_0_0_14px_rgba(216,102,69,0.09),0_0_45px_rgba(216,102,69,0.8)]" : "shadow-[0_0_28px_rgba(216,102,69,0.65)]"}`} />
-                <span className="mt-3 block rounded-full border border-zinc-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-zinc-900 shadow-md backdrop-blur-xl">{city} · {cityGroups[city].length}</span>
-              </button>
-            );
-          })}
-          <span className="pointer-events-none absolute bottom-5 right-5 text-[clamp(60px,12vw,170px)] font-black leading-none tracking-[-0.08em] text-zinc-900/[0.04]">MEMORY</span>
+        <div className="min-h-[620px] bg-[radial-gradient(circle_at_58%_55%,rgba(216,102,69,0.12),transparent_22rem),linear-gradient(140deg,#fff,#f4f1e9)]">
+          <div className="relative z-20 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 bg-white/75 p-4 backdrop-blur-xl">
+            <div className="flex max-w-full gap-1 overflow-auto rounded-full border border-zinc-200 bg-white p-1">
+              <button onClick={() => setYear("all")} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition ${year === "all" ? "bg-zinc-950 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}>全部</button>
+              {years.map((item) => (
+                <button key={item} onClick={() => setYear(item)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition ${year === item ? "bg-zinc-950 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}>{item}</button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowRoute((current) => !current)}
+              disabled={routeStops.length < 2}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-35 ${showRoute ? "border-[#a44b32] bg-[#a44b32] text-white" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"}`}
+            >
+              <Route className="h-3.5 w-3.5" /> 足迹路线
+            </button>
+          </div>
+
+          <div className="relative min-h-[552px] overflow-hidden">
+            <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="absolute inset-0 h-full w-full" role="img" aria-label="中国演出记忆热力地图">
+              <g stroke="#ffffff" strokeWidth="1.2" strokeLinejoin="round">
+                {provincePathData.map((province) => {
+                  const count = provinceCounts[province.name] ?? 0;
+                  const provinceCity = cities.find((city) => cityMetaOf(city)?.province === province.name);
+                  return (
+                    <path
+                      key={province.name}
+                      d={province.d}
+                      fill={provinceHeatColor(count)}
+                      className="transition duration-300 hover:brightness-95"
+                      onClick={() => provinceCity && setActiveCity(provinceCity)}
+                      style={{ cursor: provinceCity ? "pointer" : "default" }}
+                    >
+                      <title>{province.name}{count ? ` · ${count} 场` : " · 暂无记录"}</title>
+                    </path>
+                  );
+                })}
+              </g>
+
+              {showRoute && routeStops.length > 1 ? (
+                <polyline
+                  points={routeStops.map((stop) => `${stop.x.toFixed(1)},${stop.y.toFixed(1)}`).join(" ")}
+                  fill="none"
+                  stroke="#a44b32"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="7 7"
+                  opacity="0.78"
+                />
+              ) : null}
+
+              {mappedCities.map(({ city, x, y, count }) => {
+                const active = city === activeCity;
+                const recent = city === latestMappedCity;
+                const radius = 5 + Math.min(5, count * 1.25);
+                return (
+                  <g
+                    key={city}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${city}，${count} 场演出`}
+                    onClick={() => setActiveCity(city)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") setActiveCity(city);
+                    }}
+                    className="cursor-pointer outline-none"
+                  >
+                    <circle cx={x} cy={y} r={18} fill="transparent" />
+                    {recent ? (
+                      <circle cx={x} cy={y} r={radius + 4} fill="none" stroke="#a44b32" strokeWidth="1.5" opacity="0.65">
+                        <animate attributeName="r" values={`${radius + 3};${radius + 12};${radius + 3}`} dur="2.4s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.65;0.05;0.65" dur="2.4s" repeatCount="indefinite" />
+                      </circle>
+                    ) : null}
+                    <circle cx={x} cy={y} r={radius} fill={active ? "#a44b32" : "#18181b"} stroke="#ffffff" strokeWidth="2.5" />
+                    <text
+                      x={x}
+                      y={y + radius + 15}
+                      textAnchor="middle"
+                      fontSize="11"
+                      fontWeight="700"
+                      fill={active ? "#7c2d1d" : "#27272a"}
+                      style={{ paintOrder: "stroke", stroke: "rgba(255,255,255,0.96)", strokeWidth: 4, strokeLinejoin: "round" }}
+                    >
+                      {city} · {count}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {southChinaSeaPath ? (
+                <g transform={`translate(${MAP_WIDTH - 120} ${MAP_HEIGHT - 144})`}>
+                  <rect width="110" height="136" rx="10" fill="rgba(255,255,255,0.72)" stroke="#d4d4d8" />
+                  <path d={southChinaSeaPath} fill="rgba(234,208,196,0.35)" stroke="#a8a29e" strokeWidth="0.8" />
+                </g>
+              ) : null}
+            </svg>
+
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 text-[10px] font-medium text-zinc-500 shadow-sm backdrop-blur-xl">
+              <span>少</span>
+              {["#eeeae2", "#ead0c4", "#d28a70", "#aa5138", "#7c2d1d"].map((color) => <span key={color} className="h-2.5 w-6 rounded-full" style={{ backgroundColor: color }} />)}
+              <span>多</span>
+            </div>
+            <span className="pointer-events-none absolute bottom-4 right-4 text-[clamp(54px,9vw,120px)] font-black leading-none tracking-[-0.08em] text-zinc-900/[0.035]">MEMORY</span>
+          </div>
         </div>
+
         <aside className="border-t border-zinc-200 bg-white/90 lg:border-l lg:border-t-0">
           <div className="border-b border-zinc-200 p-6">
             <p className="text-xs uppercase tracking-[0.18em] text-[#a44b32]">Selected city</p>
-            <h2 className="mt-2 text-4xl font-black">{activeCity}</h2>
-            <p className="mt-2 text-sm text-zinc-500">{activeRecords.length} 场演出记忆</p>
+            <h2 className="mt-2 text-4xl font-black">{activeCity || "暂无城市"}</h2>
+            <p className="mt-2 text-sm text-zinc-500">{activeRecords.length} 场演出记忆{year === "all" ? "" : ` · ${year}`}</p>
           </div>
           <div className="grid max-h-[480px] gap-3 overflow-auto p-4 lg:max-h-[510px]">
             {activeRecords.map((record) => (
@@ -535,6 +802,7 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
                 </span>
               </button>
             ))}
+            {!activeRecords.length ? <p className="p-4 text-sm leading-6 text-zinc-500">这个年份还没有可显示的城市记录。</p> : null}
           </div>
         </aside>
       </div>
