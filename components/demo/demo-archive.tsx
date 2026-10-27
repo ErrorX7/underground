@@ -277,6 +277,15 @@ const cityMapMeta: Record<string, CityMapMeta> = {
   澳门: { province: "澳门特别行政区", coordinate: [113.5439, 22.1987] },
 };
 
+const cityLabelOffsets: Record<string, Coordinate> = {
+  南京: [-28, -10],
+  常州: [-8, 8],
+  杭州: [-4, 20],
+  上海: [30, -12],
+  广州: [-18, 12],
+  深圳: [22, 8],
+};
+
 function normalizeCityName(city: string) {
   return city.trim().replace(/[市区县]$/, "");
 }
@@ -733,6 +742,7 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
                 const active = city === activeCity;
                 const recent = city === latestMappedCity;
                 const radius = 5 + Math.min(5, count * 1.25);
+                const [labelDx, labelDy] = cityLabelOffsets[normalizeCityName(city)] ?? [0, 0];
                 return (
                   <g
                     key={city}
@@ -754,8 +764,8 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
                     ) : null}
                     <circle cx={x} cy={y} r={radius} fill={active ? "#a44b32" : "#18181b"} stroke="#ffffff" strokeWidth="2.5" />
                     <text
-                      x={x}
-                      y={y + radius + 15}
+                      x={x + labelDx}
+                      y={y + radius + 15 + labelDy}
                       textAnchor="middle"
                       fontSize="11"
                       fontWeight="700"
