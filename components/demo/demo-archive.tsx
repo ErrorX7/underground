@@ -770,7 +770,6 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
               {["#eeeae2", "#ead0c4", "#d28a70", "#aa5138", "#7c2d1d"].map((color) => <span key={color} className="h-2.5 w-6 rounded-full" style={{ backgroundColor: color }} />)}
               <span>多</span>
             </div>
-            <span className="pointer-events-none absolute bottom-4 right-4 text-[clamp(54px,9vw,120px)] font-black leading-none tracking-[-0.08em] text-zinc-900/[0.035]">MEMORY</span>
           </div>
         </div>
 
