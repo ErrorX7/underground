@@ -917,7 +917,7 @@ function TicketPurchaseFields({ record }: { record?: DemoPerformance }) {
         </select>
       </label>
       <Field label="实际花费" name="actualPrice" type="number" min="0" step="0.01" defaultValue={record?.actualPrice} placeholder="含手续费、代拍费或加价" />
-      <details defaultOpen={Boolean(record?.ticketSource)} className="group rounded-xl border border-zinc-200 bg-[#faf9f6] md:col-span-2">
+      <details className="group rounded-xl border border-zinc-200 bg-[#faf9f6] md:col-span-2">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-zinc-700">
           <span className="inline-flex items-center gap-2">补充购票来源 <span className="text-xs font-normal text-zinc-400">选填</span><span className="text-zinc-400 transition group-open:rotate-45">＋</span></span>
         </summary>
