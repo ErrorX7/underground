@@ -667,10 +667,8 @@ function MapView({ cityGroups, onSelect }: { cityGroups: Record<string, DemoPerf
 
   return (
     <section className="page-in">
-      <div className="mb-8">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#a44b32]">Map memory</p>
-        <h1 className="max-w-4xl text-[clamp(42px,6vw,82px)] font-black leading-[0.9] tracking-[-0.05em]">去过的地方，会在地图上慢慢变深。</h1>
-        <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-600">省份颜色记录演出密度；打开足迹路线，就能看见一次次出发如何连成自己的巡演地图。</p>
+      <div className="mb-5">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#a44b32]">MAP</p>
       </div>
 
       <div className="grid overflow-hidden rounded-[24px] border border-zinc-200 bg-white lg:grid-cols-[minmax(0,1fr)_380px]">
