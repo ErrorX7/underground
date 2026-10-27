@@ -321,7 +321,7 @@ export function DemoArchive({ initialView = "archive" }: { initialView?: ViewMod
           <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView("archive")}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-zinc-300 bg-[repeating-radial-gradient(circle_at_center,#d4d4d8_0_1px,#fafafa_1px_5px)] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] after:h-1.5 after:w-1.5 after:rounded-full after:bg-zinc-950 after:shadow-[0_0_22px_rgba(216,102,69,0.75)]" />
             <span>
-              <span className="block text-sm font-black uppercase tracking-[0.14em]">Stage Archive</span>
+              <span className="block text-sm font-black uppercase tracking-[0.14em]">Underground</span>
               <span className="hidden text-[10px] uppercase tracking-[0.2em] text-zinc-500 sm:block">Personal live memory</span>
             </span>
           </button>
@@ -353,12 +353,9 @@ export function DemoArchive({ initialView = "archive" }: { initialView?: ViewMod
               <div>
                 <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#a44b32]">Personal performance archive</p>
                 <h1 className="max-w-[920px] text-[clamp(40px,6.2vw,88px)] font-black leading-[0.87] tracking-[-0.055em]">
-                  把现场留下，
-                  <span className="block text-zinc-500">也把当时的自己留下。</span>
+                  Underground
+                  <span className="block text-zinc-500">Live for the Live</span>
                 </h1>
-                <p className="mt-6 max-w-2xl text-[15px] leading-7 text-zinc-600">
-                  不是票务清单，也不是公开动态。这里保存入场前的期待、舞台亮起的瞬间，以及散场以后还没有消失的回声。
-                </p>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Stat value={records.length} label="场演出" />
