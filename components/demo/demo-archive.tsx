@@ -22,6 +22,33 @@ import chinaGeo from "@/data/china-geo.json";
 type PerformanceType = "livehouse" | "bar" | "arena";
 type TicketMethod = "official" | "proxy" | "resale" | "scalper" | "gift" | "other";
 type ViewMode = "archive" | "map";
+type TransportMode = "rail" | "flight" | "car" | "transit" | "other";
+
+type TransportJourney = {
+  id: string;
+  mode: TransportMode;
+  from: string;
+  to: string;
+  departureDate: string;
+  departureTime: string;
+  arrivalDate: string;
+  arrivalTime: string;
+  serviceNumber?: string;
+  ticketImage?: string;
+  trackExpense?: boolean;
+  amount?: number;
+};
+
+type TimelineItem = {
+  phase: string;
+  date?: string;
+  time: string;
+  emoji?: string;
+  title: string;
+  content: string;
+  image?: string;
+  transportJourneys?: TransportJourney[];
+};
 
 type DemoPerformance = {
   id: string;
@@ -40,7 +67,7 @@ type DemoPerformance = {
   cover: string;
   line: string;
   note: string;
-  timeline: { phase: string; date?: string; time: string; emoji?: string; title: string; content: string; image?: string }[];
+  timeline: TimelineItem[];
   media: string[];
 };
 
@@ -79,7 +106,28 @@ const seedPerformances: DemoPerformance[] = [
     line: "海上漂浮的空瓶，载满爱的信号，最后变成指路的灯火。",
     note: "从第一首歌响起，舞台像一片缓慢涨潮的海。散场以后没有马上离开，在门口把最后一点回声听完。",
     timeline: [
-      { phase: "演出前", emoji: "🎟️", time: "16:40", title: "抵达杭州", content: "天气很热，背着相机沿着场馆外墙找入口。", image: media[1] },
+      {
+        phase: "演出前",
+        emoji: "🎟️",
+        time: "16:40",
+        title: "抵达杭州",
+        content: "天气很热，背着相机沿着场馆外墙找入口。",
+        image: media[1],
+        transportJourneys: [
+          {
+            id: "demo-journey-changzhou-hangzhou",
+            mode: "rail",
+            from: "常州",
+            to: "杭州",
+            departureDate: "2026-08-01",
+            departureTime: "09:15",
+            arrivalDate: "2026-08-01",
+            arrivalTime: "10:45",
+            serviceNumber: "Gxxxx",
+            trackExpense: false,
+          },
+        ],
+      },
       { phase: "演出中", emoji: "🎤", time: "21:18", title: "灯火亮起", content: "全场的手机灯一起晃，像漂浮在黑色海面上的信号。", image: media[0] },
       { phase: "演出后", emoji: "🌙", time: "23:26", title: "带着耳鸣回去", content: "在便利店买了冰水，舍不得摘掉手环。", image: media[3] },
     ],
@@ -208,6 +256,22 @@ const ticketMethodLabels: Record<TicketMethod, string> = {
 };
 
 const emojiOptions = ["", "🎟️", "✨", "🎤", "📸", "🚆", "🍜", "💭", "❤️", "😭", "🔥", "🌙"];
+
+const transportModeLabels: Record<TransportMode, string> = {
+  rail: "高铁 / 火车",
+  flight: "飞机",
+  car: "汽车 / 自驾",
+  transit: "地铁 / 公交",
+  other: "其他",
+};
+
+const transportModeIcons: Record<TransportMode, string> = {
+  rail: "🚄",
+  flight: "✈️",
+  car: "🚗",
+  transit: "🚇",
+  other: "🚶",
+};
 
 type Coordinate = [number, number];
 type GeoGeometry =
@@ -424,6 +488,21 @@ function formatDate(date: string) {
   });
 }
 
+function formatJourneyDateTime(date: string, time: string) {
+  if (!date && !time) return "时间待补充";
+  return [date ? date.replaceAll("-", ".") : "", time].filter(Boolean).join(" ");
+}
+
+function formatJourneySummary(journey: TransportJourney) {
+  if (journey.departureDate && journey.arrivalDate && journey.departureDate !== journey.arrivalDate) {
+    return `${formatJourneyDateTime(journey.departureDate, journey.departureTime)} → ${formatJourneyDateTime(journey.arrivalDate, journey.arrivalTime)}`;
+  }
+  if (journey.departureTime || journey.arrivalTime) {
+    return `${journey.departureTime || "--:--"} → ${journey.arrivalTime || "--:--"}`;
+  }
+  return journey.departureDate ? journey.departureDate.replaceAll("-", ".") : "时间待补充";
+}
+
 export function DemoArchive({ initialView = "archive" }: { initialView?: ViewMode }) {
   const [records, setRecords] = useState<DemoPerformance[]>(seedPerformances);
   const [hydrated, setHydrated] = useState(false);
@@ -444,6 +523,7 @@ export function DemoArchive({ initialView = "archive" }: { initialView?: ViewMod
             ...item,
             date: item.date ?? record.date,
             emoji: item.emoji ?? "",
+            transportJourneys: item.transportJourneys ?? [],
           })),
         })));
       }
@@ -1036,6 +1116,108 @@ function Field({ label, className = "", ...props }: React.InputHTMLAttributes<HT
   );
 }
 
+function TransportJourneyEditor({
+  journey,
+  index,
+  expanded,
+  processing,
+  onToggle,
+  onChange,
+  onRemove,
+  onImageChange,
+}: {
+  journey: TransportJourney;
+  index: number;
+  expanded: boolean;
+  processing: boolean;
+  onToggle: () => void;
+  onChange: (patch: Partial<TransportJourney>) => void;
+  onRemove: () => void;
+  onImageChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const route = `${journey.from.trim() || "出发地"} → ${journey.to.trim() || "目的地"}`;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-zinc-50">
+        <span className="min-w-0">
+          <span className="flex items-center gap-2 text-sm font-bold text-zinc-800"><span aria-hidden="true">{transportModeIcons[journey.mode]}</span>交通行程 {String(index + 1).padStart(2, "0")}</span>
+          <span className="mt-1.5 block truncate text-xs text-zinc-500">{route} · {transportModeLabels[journey.mode]}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 pt-0.5 text-[11px] text-zinc-400">{expanded ? "收起" : "展开"}<span className={`text-base transition ${expanded ? "rotate-180" : ""}`}>⌄</span></span>
+      </button>
+
+      {expanded ? (
+        <div className="grid gap-3 border-t border-zinc-200 bg-[#fcfbf8] p-4 md:grid-cols-2">
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600 md:col-span-2">
+            交通方式
+            <select value={journey.mode} onChange={(event) => onChange({ mode: event.target.value as TransportMode })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950">
+              {(Object.keys(transportModeLabels) as TransportMode[]).map((mode) => <option key={mode} value={mode}>{transportModeIcons[mode]} {transportModeLabels[mode]}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">出发城市<input value={journey.from} onChange={(event) => onChange({ from: event.target.value })} placeholder="例如：常州" className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">目的城市<input value={journey.to} onChange={(event) => onChange({ to: event.target.value })} placeholder="例如：杭州" className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">出发日期<input type="date" value={journey.departureDate} onChange={(event) => onChange({ departureDate: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">出发时间<input type="time" value={journey.departureTime} onChange={(event) => onChange({ departureTime: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">到达日期<input type="date" value={journey.arrivalDate} onChange={(event) => onChange({ arrivalDate: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600">到达时间<input type="time" value={journey.arrivalTime} onChange={(event) => onChange({ arrivalTime: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
+          <label className="grid gap-1.5 text-xs font-medium text-zinc-600 md:col-span-2">车次 / 航班号 <span className="font-normal text-zinc-400">（选填）</span><input value={journey.serviceNumber ?? ""} onChange={(event) => onChange({ serviceNumber: event.target.value })} placeholder="例如：Gxxxx / MUxxxx" className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950" /></label>
+
+          <div className="grid gap-3 md:col-span-2 md:grid-cols-[1fr_180px]">
+            <label className="grid min-h-28 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-zinc-300 bg-white p-4 text-center transition hover:border-[#a44b32]">
+              <input type="file" accept="image/*" className="sr-only" onChange={onImageChange} />
+              <span><ImagePlus className="mx-auto h-5 w-5 text-[#a44b32]" /><strong className="mt-2 block text-xs">{processing ? "正在处理票据…" : journey.ticketImage ? "更换车票 / 机票截图" : "上传车票 / 机票截图"}</strong><span className="mt-1 block text-[11px] text-zinc-500">票据将独立保存，不进入节点图片</span></span>
+            </label>
+            <div className="relative min-h-28 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+              {journey.ticketImage ? <>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={journey.ticketImage} alt="交通票据预览" className="absolute inset-0 h-full w-full object-cover" /><button type="button" onClick={() => onChange({ ticketImage: undefined })} aria-label="移除交通票据" className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/95 shadow"><X className="h-3.5 w-3.5" /></button></> : <span className="grid h-full min-h-28 place-items-center text-xs text-zinc-400">暂无票据</span>}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 md:col-span-2">
+            <input type="checkbox" checked={journey.trackExpense ?? false} onChange={(event) => onChange({ trackExpense: event.target.checked, amount: event.target.checked ? journey.amount : undefined })} className="h-4 w-4 accent-[#a44b32]" />
+            记录本次交通花费
+          </label>
+          {journey.trackExpense ? <label className="grid gap-1.5 text-xs font-medium text-zinc-600 md:col-span-2">实际支付金额 <span className="font-normal text-zinc-400">（选填）</span><input type="number" min="0" step="0.01" value={journey.amount ?? ""} onChange={(event) => onChange({ amount: event.target.value === "" ? undefined : Number(event.target.value) })} placeholder="¥ 0.00" className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950" /></label> : null}
+
+          <div className="flex justify-end border-t border-zinc-200 pt-3 md:col-span-2">
+            <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-red-600 transition hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />删除行程</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TransportJourneyCard({ journey }: { journey: TransportJourney }) {
+  const [expanded, setExpanded] = useState(false);
+  const route = `${journey.from.trim() || "出发地"} → ${journey.to.trim() || "目的地"}`;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[#faf9f6]">
+      <button type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded} className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-zinc-100/80">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#a44b32]/10 text-lg" aria-hidden="true">{transportModeIcons[journey.mode]}</span>
+          <span className="min-w-0">
+            <strong className="block truncate text-sm text-zinc-800">{route}</strong>
+            <span className="mt-0.5 block text-[11px] text-zinc-500">{transportModeLabels[journey.mode]}{journey.serviceNumber ? ` · ${journey.serviceNumber}` : ""}</span>
+          </span>
+        </span>
+        <span className="shrink-0 text-xs font-medium text-zinc-500">{formatJourneySummary(journey)} <span className={`ml-1 inline-block transition ${expanded ? "rotate-180" : ""}`}>⌄</span></span>
+      </button>
+
+      {expanded ? (
+        <div className="grid gap-3 border-t border-zinc-200 bg-white p-4 text-xs leading-5 text-zinc-600 sm:grid-cols-2">
+          <span><span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">Departure</span>{formatJourneyDateTime(journey.departureDate, journey.departureTime)}</span>
+          <span><span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">Arrival</span>{formatJourneyDateTime(journey.arrivalDate, journey.arrivalTime)}</span>
+          {journey.serviceNumber ? <span><span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">车次 / 航班</span>{journey.serviceNumber}</span> : null}
+          {journey.trackExpense && journey.amount !== undefined ? <span><span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">交通花费</span>¥{formatMoney(journey.amount)}</span> : null}
+          {journey.ticketImage ? <div className="overflow-hidden rounded-lg border border-zinc-200 sm:col-span-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={journey.ticketImage} alt={route + "交通票据"} className="max-h-64 w-full object-contain bg-zinc-50" /></div> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function DetailModal({
   record,
   onClose,
@@ -1054,6 +1236,8 @@ function DetailModal({
   const [coverDraft, setCoverDraft] = useState(record.cover);
   const [timelineDraft, setTimelineDraft] = useState(record.timeline);
   const [processingTimelineImage, setProcessingTimelineImage] = useState<number | null>(null);
+  const [processingJourneyImage, setProcessingJourneyImage] = useState<string | null>(null);
+  const [expandedJourneyIds, setExpandedJourneyIds] = useState<Record<string, boolean>>({});
   const [detailImageProcessing, setDetailImageProcessing] = useState(false);
 
   function saveDetails(event: FormEvent<HTMLFormElement>) {
@@ -1109,8 +1293,60 @@ function DetailModal({
     }
   }
 
+  function addTransportJourney(nodeIndex: number) {
+    const id = window.crypto?.randomUUID?.() ?? `journey-${Date.now()}-${nodeIndex}`;
+    const date = timelineDraft[nodeIndex]?.date ?? record.date;
+    const journey: TransportJourney = {
+      id,
+      mode: "rail",
+      from: "",
+      to: "",
+      departureDate: date,
+      departureTime: "",
+      arrivalDate: date,
+      arrivalTime: "",
+      serviceNumber: "",
+      trackExpense: false,
+    };
+    setTimelineDraft((current) => current.map((item, itemIndex) => itemIndex === nodeIndex ? { ...item, transportJourneys: [...(item.transportJourneys ?? []), journey] } : item));
+    setExpandedJourneyIds((current) => ({ ...current, [id]: true }));
+  }
+
+  function updateTransportJourney(nodeIndex: number, journeyId: string, patch: Partial<TransportJourney>) {
+    setTimelineDraft((current) => current.map((item, itemIndex) => {
+      if (itemIndex !== nodeIndex) return item;
+      return {
+        ...item,
+        transportJourneys: (item.transportJourneys ?? []).map((journey) => journey.id === journeyId ? { ...journey, ...patch } : journey),
+      };
+    }));
+  }
+
+  function removeTransportJourney(nodeIndex: number, journeyId: string) {
+    setTimelineDraft((current) => current.map((item, itemIndex) => itemIndex === nodeIndex ? { ...item, transportJourneys: (item.transportJourneys ?? []).filter((journey) => journey.id !== journeyId) } : item));
+    setExpandedJourneyIds((current) => {
+      const next = { ...current };
+      delete next[journeyId];
+      return next;
+    });
+  }
+
+  async function changeTransportTicketImage(nodeIndex: number, journeyId: string, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProcessingJourneyImage(journeyId);
+    try {
+      updateTransportJourney(nodeIndex, journeyId, { ticketImage: await imageFileToDataUrl(file) });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "票据图片处理失败");
+    } finally {
+      setProcessingJourneyImage(null);
+    }
+  }
+
   function cancelTimelineEdit() {
     setTimelineDraft(record.timeline);
+    setExpandedJourneyIds({});
     setEditingTimeline(false);
   }
 
@@ -1218,6 +1454,25 @@ function DetailModal({
                         <label className="grid gap-1.5 text-xs font-medium text-zinc-600">时间<input type="time" value={item.time} onChange={(event) => updateTimelineItem(index, { time: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
                         <label className="grid gap-1.5 text-xs font-medium text-zinc-600 md:col-span-2">标题<input value={item.title} onChange={(event) => updateTimelineItem(index, { title: event.target.value })} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-950" /></label>
                         <label className="grid gap-1.5 text-xs font-medium text-zinc-600 md:col-span-2">记录<textarea value={item.content} onChange={(event) => updateTimelineItem(index, { content: event.target.value })} className="min-h-24 rounded-lg border border-zinc-300 bg-white p-3 text-sm leading-6 text-zinc-950 outline-none focus:border-zinc-950" /></label>
+
+                        <div className="grid gap-3 border-t border-zinc-200 pt-4 md:col-span-2">
+                          {(item.transportJourneys ?? []).map((journey, journeyIndex) => (
+                            <TransportJourneyEditor
+                              key={journey.id}
+                              journey={journey}
+                              index={journeyIndex}
+                              expanded={Boolean(expandedJourneyIds[journey.id])}
+                              processing={processingJourneyImage === journey.id}
+                              onToggle={() => setExpandedJourneyIds((current) => ({ ...current, [journey.id]: !current[journey.id] }))}
+                              onChange={(patch) => updateTransportJourney(index, journey.id, patch)}
+                              onRemove={() => removeTransportJourney(index, journey.id)}
+                              onImageChange={(event) => changeTransportTicketImage(index, journey.id, event)}
+                            />
+                          ))}
+                          <button type="button" onClick={() => addTransportJourney(index)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white text-xs font-bold text-zinc-700 transition hover:border-[#a44b32] hover:text-[#a44b32]"><Plus className="h-4 w-4" />添加交通行程</button>
+                        </div>
+
+                        <p className="text-xs font-medium text-zinc-600 md:col-span-2">节点图片</p>
                         <div className="grid gap-3 md:col-span-2 md:grid-cols-[1fr_180px]">
                           <label className="grid min-h-28 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-zinc-300 bg-white p-4 text-center hover:border-[#a44b32]">
                             <input type="file" accept="image/*" className="sr-only" onChange={(event) => changeTimelineImage(index, event)} />
@@ -1230,8 +1485,8 @@ function DetailModal({
                       </div>
                     </div>
                   ))}
-                  <button type="button" onClick={() => setTimelineDraft((current) => [...current, { phase: "新节点", date: record.date, time: "", emoji: "✨", title: "", content: "", image: undefined }])} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 text-sm font-bold text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50"><Plus className="h-4 w-4" />添加时间节点</button>
-                  <button type="button" onClick={saveTimeline} disabled={processingTimelineImage !== null} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 text-sm font-bold text-white disabled:opacity-50"><Check className="h-4 w-4" />保存时间线</button>
+                  <button type="button" onClick={() => setTimelineDraft((current) => [...current, { phase: "新节点", date: record.date, time: "", emoji: "✨", title: "", content: "", image: undefined, transportJourneys: [] }])} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 text-sm font-bold text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50"><Plus className="h-4 w-4" />添加时间节点</button>
+                  <button type="button" onClick={saveTimeline} disabled={processingTimelineImage !== null || processingJourneyImage !== null} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 text-sm font-bold text-white disabled:opacity-50"><Check className="h-4 w-4" />保存时间线</button>
                 </div>
               ) : (
                 <div className="relative mt-7">
@@ -1248,6 +1503,11 @@ function DetailModal({
                           </div>
                           <h3 className="mt-2 text-lg font-black">{item.title}</h3>
                           <p className="mt-2 text-sm leading-7 text-zinc-600">{item.content}</p>
+                          {item.transportJourneys?.length ? (
+                            <div className="mt-4 grid gap-2">
+                              {item.transportJourneys.map((journey) => <TransportJourneyCard key={journey.id} journey={journey} />)}
+                            </div>
+                          ) : null}
                         </div>
                         {item.image ? <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={item.image} alt={item.title} className="aspect-[4/3] h-full w-full object-cover" /></div> : null}
                       </article>
