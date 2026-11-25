@@ -6,8 +6,9 @@ const shots = {
   book: ['手翻书','从纸里打开那一晚','左页是入场券、电子入场章和随记，右页是一张向内折的场地示意。示意图只表达第一人称视角。','点红点「我在这儿」展开舞台，让白边相片从书缝滑出来；点「看背面」读散场瞬间。左右翻页换场。','展纸 0.52 秒，相片晚半拍滑出后停住。翻场只动半页。手机上可轻扫，系统减少动态时直接换画面。'],
   entry: ['新建 / 编辑演出','印一张演出票根','表单用纸白底。封面预览随输入变成一张标签，票价、购票方式等次要资料归在折叠区。','上传封面、填写场次后保存。本次审稿的表单只修改这次打开的示例。','保存后在详情页看到刚填的封面和文字，减少从头找场次的动作。'],
   edit: ['时间线编辑','把一段路夹进节点','节点沿竖线排开。记录文字下面是行程卡，再往下贴照片。车次或航班号像票面印字。','点节点修改时间、阶段或文字。可添加多段行程和照片，保存后去折页看到变化。','展开行程像抽出票夹。桌面左右分栏，手机先选节点再编辑。'],
-  map: ['地图记忆','按城市翻找现场','沿用中国地图和城市记录，右侧像车站到发板。切换年份看那一年的场次。','点城市或站牌看该城记录，再点场名回到详情。「足迹」连接按日期排列的演出城市。','选站时目的地文字替换、站点亮起。真实乘车或航班信息仍取自该场的行程卡。'],
-  hall: ['名人堂 / 里程碑','散场后的后台走廊','黑底艺人榜旁是当前艺人的候选歌单。对决窗口中，两面候选卡映出你的选择。','添加艺人，用上下箭头排位。填歌单或勾选演出，两两选择，每一票生成晋级树的一条分支。','点纪念章直接回到那晚的详情。让每个章都能翻到具体的一页。']
+  map: ['地图记忆','按城市翻找现场','沿用中国地图和城市记录，右侧像车站到发板。切换年份看那一年的场次。地图下方的里程碑可以回到对应现场。','点城市或站牌看该城记录，再点场名回到详情。「足迹」连接按日期排列的演出城市。','选站时目的地文字替换、站点亮起。真实乘车或航班信息仍取自该场的行程卡。'],
+  hall: ['名人堂','后台艺人榜','左边是个人排名，右边翻看选中艺人的专辑和巡演。','添加艺人或调整顺序，也可以从右上角进入对决。','从名人堂走进 Battle，再回到同一位艺人的档案。'],
+  battle: ['Battle 对决','抽签上场','歌曲与现场共用一座擂台，一次只看一种对决。','选艺人抽取歌单，或用已收录的全部现场开赛。每轮选择 A 面或 B 面晋级。','对阵表保留每一轮的选择，重开时重新抽签。']
 };
 const keys=Object.keys(shots), phases=['演出前','演出中','演出后'];
 const $=selector=>document.querySelector(selector);
@@ -39,7 +40,7 @@ const recButton=(r,label)=>'<button data-record="'+escape(r.id)+'">'+(label||esc
 function routeHash(key,id=selectedId){return '#'+key+(['detail','book','edit'].includes(key)?'/'+encodeURIComponent(id):'')}
 function readRoute(){const [key,raw]=location.hash.slice(1).split('/');if(raw){try{const id=decodeURIComponent(raw);if(records.some(r=>r.id===id))selectedId=id}catch{}}if(keys.includes(key))return key;try{return sessionStorage.getItem('ug-review-entered')?'wall':'door'}catch{return 'door'}}
 function loadScreen(key){
-  current=key;if(key==='book')bookSide='closed';
+  current=key;if(key==='battle')personalHall.enterBattle();if(key==='book')bookSide='closed';
   if(key==='edit'){timelineDraft=structuredClone(rec().timeline);nodeIndex=0}
   if(key==='entry'){entryDraft=entryMode==='edit'?structuredClone(rec()):{title:'',artist:'',guest:'',date:'',time:'',city:'',venue:'',type:'livehouse',price:'',line:'',ticketMethod:'',ticketSource:'',actualPrice:''};entryCover=entryMode==='edit'&&rec().cover?.startsWith('blob:')?rec().cover:''}
   render();window.scrollTo({top:0,behavior:'instant'});selector.focus({preventScroll:true});
@@ -71,7 +72,7 @@ function navigate(key,{transition=true,replace=false}={}){
 }
 window.addEventListener('popstate',()=>loadScreen(readRoute()));
 function render(){
-  selector.innerHTML=({door:doorScreen,wall:wallScreen,detail:detailScreen,book:bookScreen,entry:entryScreen,edit:editScreen,map:mapScreen,hall:hallScreen})[current]();
+  selector.innerHTML=({door:doorScreen,wall:wallScreen,detail:detailScreen,book:bookScreen,entry:entryScreen,edit:editScreen,map:mapScreen,hall:hallScreen,battle:battleScreen})[current]();
   $('#shot-count').textContent=num()+' / '+pad(keys.length);
   $('#prev-shot').disabled=current===keys[0];$('#next-shot').disabled=current===keys.at(-1);
   document.querySelectorAll('header nav button').forEach(b=>{if(b.dataset.go===current)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
@@ -167,7 +168,7 @@ const project=([x,y])=>[24+(x-72)/64*712,24+(54.5-y)/38.5*492];const position=n=
 const shapes=geo.map(p=>'<path d="'+p.d+'" fill="'+(activeProvinces.has(p.n)?'#c89c81':'#d9d6c8')+'" stroke="#fcfaf1" stroke-width=".85"/>').join('');
 const stops=items.slice().sort((a,b)=>a.date.localeCompare(b.date)).filter(r=>coords[r.city]).map(r=>position(r.city).join(',')).join(' ');
 const dots=locs.map(c=>{const [x,y]=position(c);return '<g role="button" tabindex="0" data-city="'+escape(c)+'" aria-label="'+escape(c)+'"><title>'+escape(c)+'</title><circle cx="'+x+'" cy="'+y+'" r="8" fill="transparent"/><circle cx="'+x+'" cy="'+y+'" r="'+(c===city?5.6:3.1)+'" stroke="#faf6df" stroke-width="1.5" fill="'+(c===city?'#ba3722':'#282820')+'"/></g>'}).join('');
-return section(tag('ON THE ROAD / 城市足迹')+'<div class="rowhead"><div>'+title('地图记忆')+'<p class="sub">点亮一座城，找回在那里看过的演出。</p></div><div class="actions"><select class="field" style="width:auto" id="year" aria-label="选择年份">'+options({all:'全部年份',...Object.fromEntries(years.map(y=>[y,y]))},year)+'</select><button class="chip '+(route?'on':'')+'" data-route aria-pressed="'+route+'">足迹 '+(route?'开':'关')+'</button></div></div><div class="mapgrid"><div class="mapcanvas"><svg viewBox="0 0 760 580" role="group" aria-label="中国演出城市地图">'+shapes+(route?'<polyline points="'+stops+'" fill="none" stroke="#ac3b25" stroke-width="2" stroke-dasharray="6 5"/>':'')+dots+'</svg><small><a href="MAP_DATA_ATTRIBUTION.md">地图来源 · Map of Us</a></small></div><aside class="station"><div class="mono">STATION BOARD / 到站</div><h2>'+escape(city||'暂无城市')+'</h2><p class="sub">'+pad(hits.length)+' 场　/　'+(hits[0]?escape(hits[0].date)+' 首次打卡':'')+'</p><div class="shows">'+hits.map(r=>recButton(r)).join('')+'</div>'+cities.map(c=>'<button class="cityrow '+(c===city?'on':'')+'" data-city="'+escape(c)+'"><span>●</span><b>'+escape(c)+'</b><span class="mono">'+pad(items.filter(r=>r.city===c).length)+'</span></button>').join('')+'</aside></div>')}
+return section(tag('ON THE ROAD / 城市足迹')+'<div class="rowhead"><div>'+title('地图记忆')+'<p class="sub">点亮一座城，找回在那里看过的演出。</p></div><div class="actions"><select class="field" style="width:auto" id="year" aria-label="选择年份">'+options({all:'全部年份',...Object.fromEntries(years.map(y=>[y,y]))},year)+'</select><button class="chip '+(route?'on':'')+'" data-route aria-pressed="'+route+'">足迹 '+(route?'开':'关')+'</button></div></div><div class="mapgrid"><div class="mapcanvas"><svg viewBox="0 0 760 580" role="group" aria-label="中国演出城市地图">'+shapes+(route?'<polyline points="'+stops+'" fill="none" stroke="#ac3b25" stroke-width="2" stroke-dasharray="6 5"/>':'')+dots+'</svg><small><a href="MAP_DATA_ATTRIBUTION.md">地图来源 · Map of Us</a></small></div><aside class="station"><div class="mono">STATION BOARD / 到站</div><h2>'+escape(city||'暂无城市')+'</h2><p class="sub">'+pad(hits.length)+' 场　/　'+(hits[0]?escape(hits[0].date)+' 首次打卡':'')+'</p><div class="shows">'+hits.map(r=>recButton(r)).join('')+'</div>'+cities.map(c=>'<button class="cityrow '+(c===city?'on':'')+'" data-city="'+escape(c)+'"><span>●</span><b>'+escape(c)+'</b><span class="mono">'+pad(items.filter(r=>r.city===c).length)+'</span></button>').join('')+'</aside></div>'+milestonePanel())}
 function repertoire(name){
  const works=records.filter(r=>r.artist===name);
  const albums=collection.filter(a=>a.artist===name);
@@ -175,7 +176,14 @@ function repertoire(name){
  return '<div class="repertoire">'+albums.map(a=>'<button class="hallalbum" data-album="'+a.id+'"><img src="'+a.cover+'" alt=""><span>收藏专辑<br><b>《'+escape(a.title)+'》 ↗</b></span></button>').join('')+tours.map(t=>'<div><small>巡演</small><b>《'+escape(t)+'》</b></div>').join('')+(works.some(r=>r.album==='飞蚊症')?'<a href="'+coolaSite+'" target="_blank" rel="noopener">进入《飞蚊症》互动音乐网站 ↗</a>':'')+'<small>我看过的场次</small>'+works.map(r=>recButton(r)).join('')+'</div>';
 }
 const personalHall = setupHall({records, names:[...new Set([...collection.map(a=>a.artist),...records.map(r=>r.artist)])],esc:escape,repertoire,render});
-function hallScreen(){const chron=records.slice().sort((a,b)=>a.date.localeCompare(b.date));const milestones=[['档案首场',chron[0]],['最早收录的 Livehouse',chron.find(r=>r.type==='livehouse')],['最早收录的跨城行程',chron.find(r=>r.timeline.some(n=>n.transportJourneys?.some(j=>j.from&&j.to&&j.from!==j.to)))]];return section(tag('BACKSTAGE / 艺人名册')+title('我的名人堂')+personalHall()+'<div class="milestones">'+milestones.filter(([,r])=>r).map(([l,r])=>'<button class="ms" data-record="'+escape(r.id)+'"><span>'+escape(r.date)+'</span><strong>'+l+'</strong>'+escape(r.city)+' ↗</button>').join('')+'</div>','dark')}
+function hallScreen(){return section('<div class="rowhead"><div>'+tag('BACKSTAGE / 艺人名册')+title('我的名人堂')+'</div>'+button('进入 Battle ↗','battle','btn hot')+'</div>'+personalHall.panel(),'dark')}
+function battleScreen(){return section(back('hall','名人堂')+tag('A / B　·　BATTLE ROOM')+title('Battle 对决')+personalHall.battlePanel())}
+function milestonePanel(){
+  const chron=records.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const milestones=[['档案首场',chron[0]],['最早收录的 Livehouse',chron.find(r=>r.type==='livehouse')],['最早收录的跨城行程',chron.find(r=>r.timeline.some(n=>n.transportJourneys?.some(j=>j.from&&j.to&&j.from!==j.to)))]];
+  const cards=milestones.filter(([,r])=>r && (year==='all'||r.date.startsWith(year))).map(([label,r])=>'<button class="ms" data-record="'+escape(r.id)+'"><span>'+escape(r.date)+'</span><strong>'+label+'</strong>'+escape(r.city)+' ↗</button>').join('');
+  return '<section class="map-achievements"><h2>足迹里程碑</h2><div class="milestones">'+(cards||'这一年暂无新增里程碑。')+'</div></section>';
+}
 function chooseRecord(id){wallMode='list';const r=records.find(v=>v.id===id);if(!r)return;selectedId=id;navigate('detail')}
 function moveShot(dir){const next=keys[keys.indexOf(current)+dir];if(next)navigate(next)}
 function saveForm(form){const data=Object.fromEntries(new FormData(form));for(const k of ['title','artist','city','venue']){data[k]=String(data[k]||'').trim();if(!data[k]){form.elements[k].focus();return}}data.price=data.price===''?null:Number(data.price);data.actualPrice=data.actualPrice?Number(data.actualPrice):undefined;
