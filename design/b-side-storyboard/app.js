@@ -99,16 +99,19 @@ function enter(skip=false){
 }
 const collection = [
   { id: 'floaters', title: '飞蚊症', artist: 'Coola', cover: albumCover,
-    note: '我为这张专辑和《折页》巡演做了一个互动音乐网站。', url: coolaSite }
+    note: '我为这张专辑和《折页》巡演做了一个互动音乐网站。', url: coolaSite },
+  {"id":"safe-landing","title":"安全着陆","artist":"安全着陆","year":"2016","cover":"https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/9d/fa/5c/9dfa5cac-40b1-3234-1818-6dda75841c98/4894972279603.jpg/1200x1200bf-60.jpg","note":"安全着陆的首张同名专辑。","info":"https://music.douban.com/subject/26993439/"},
+  {"id":"safe-duo","title":"二人赚","artist":"安全着陆","year":"2017","cover":"https://i.scdn.co/image/ab67616d0000b2736963d4e23905d627eaf18694","note":"第二张原创专辑。","info":"https://music.douban.com/subject/27139118/"},
+  {"id":"safe-manual","title":"安全自救手册","artist":"安全着陆","year":"2018","cover":"art/safe-manual.webp","note":"以航班为概念的说唱专辑。","info":"https://neodb.social/album/1ClotXVEg6eThBj8TmO4G4"}
 ];
 function albumCase(album) {
-  return '<button class="casebtn" data-album="'+escape(album.id)+'"><span class="jewel"><span class="disc"></span><span class="cover albumart" style="background-image:url('+album.cover+')"></span></span><span class="rackfoot"><strong>《'+escape(album.title)+'》</strong><span class="mono">'+escape(album.artist)+'</span></span><span class="caption">'+escape(album.note)+'</span></button>';
+  return '<button class="casebtn" data-album="'+escape(album.id)+'"><span class="jewel"><span class="disc"></span><span class="cover albumart" style="background-image:url('+album.cover+')"></span></span><span class="rackfoot"><strong>《'+escape(album.title)+'》</strong><span class="mono">'+escape(album.artist)+(album.year?' · '+escape(album.year):'')+'</span></span><span class="caption">'+escape(album.note)+'</span></button>';
 }
 function openAlbum(id) {
   const album=collection.find(a=>a.id===id);
   if(!album)return;
   const related=records.filter(r=>r.artist===album.artist&&r.album===album.title);
-  $('#drawer-body').innerHTML='<div class="albumleaf"><img src="'+album.cover+'" alt="专辑封面"><div><small>'+escape(album.artist)+'</small><h2 id="drawer-title">《'+escape(album.title)+'》</h2><p>'+escape(album.note)+'</p><a class="btn" href="'+album.url+'" target="_blank" rel="noopener">进入音乐互动站 ↗</a></div></div>'+(related.length?'<div class="related"><h3>关联现场</h3>'+related.map(r=>recButton(r)).join('')+'</div>':'');
+  $('#drawer-body').innerHTML='<div class="albumleaf"><img src="'+album.cover+'" alt="专辑封面"><div><small>'+escape(album.artist)+'</small><h2 id="drawer-title">《'+escape(album.title)+'》</h2><p>'+escape(album.note)+'</p>'+(album.url?'<a class="btn" href="'+escape(album.url)+'" target="_blank" rel="noopener">进入音乐互动站 ↗</a>':album.info?'<a class="outline" href="'+escape(album.info)+'" target="_blank" rel="noopener">查看专辑资料 ↗</a>':'')+'</div></div>'+(related.length?'<div class="related"><h3>关联现场</h3>'+related.map(r=>recButton(r)).join('')+'</div>':'');
   if(!dialog.open)dialog.showModal();
 }
 function recordStamp(r) {
@@ -142,7 +145,7 @@ function wallScreen(){
  const shelf=wallMode==='shelf';
  const header='<div class="rowhead"><div>'+tag(shelf?'A 面 / RECORD SHELF':'B 面 / TICKET ARCHIVE')+title(shelf?'我的唱片架':'我的演出票根')+'<p class="sub">'+(shelf?collection.length+' 张收藏专辑':records.length+' 场演出')+'</p></div>'+(shelf?'':button('＋ 新建演出','entry','btn'))+'</div>';
  const tabs='<div class="switchbar">'+switchButton('wall-mode','shelf','唱片架',wallMode)+switchButton('wall-mode','list','演出票根',wallMode)+'</div>';
- if(shelf)return section(header+tabs+'<div class="shelf albumrack">'+collection.map(albumCase).join('')+'</div>');
+ if(shelf){const groups=new Map();for(const album of collection){if(!groups.has(album.artist))groups.set(album.artist,[]);groups.get(album.artist).push(album)}return section(header+tabs+Array.from(groups,([name,albums])=>'<section class="album-wall-group"><div class="album-wall-heading"><h2>'+escape(name)+'</h2><span class="mono">'+pad(albums.length)+' RECORDS</span></div><div class="shelf albumrack">'+albums.map(albumCase).join('')+'</div></section>').join(''))}
  const group='<div class="switchbar">'+switchButton('group','year','按年份',listGroup)+switchButton('group','artist','按艺人',listGroup)+'</div>';
  const filters='<div class="walltools"><div class="chips">'+Object.entries({all:'全部',...types}).map(([k,v])=>switchButton('filter',k,v,filter)).join('')+'</div><input class="search" id="search" placeholder="搜索演出、艺人或城市" aria-label="搜索演出、艺人或城市" value="'+escape(query)+'"></div>';
  return section(header+tabs+filters+group+'<div class="showlist" id="rack">'+showList()+'</div>');
