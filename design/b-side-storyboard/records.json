@@ -19,13 +19,84 @@
     "album": "飞蚊症"
   },
   {
-    "time": "",
+    "time": "20:00",
     "guest": "",
     "price": null,
-    "line": "",
-    "note": "",
-    "media": [],
-    "timeline": [],
+    "line": "LIVE FOR TODAY",
+    "note": "想把你留在这里\n想把哈男永远留在livehouse\n就是这个人九年前把我一下子拉入搞哈的\n深渊呀\n绝对是我看过所有现场的top3我可以说，\n但另外top2个是谁我还不知道\nLIVE FOR TODAY",
+    "media": [
+      {
+        "asset": "hefei-stage",
+        "caption": "现场 · 彩带落下"
+      },
+      {
+        "asset": "hefei-group",
+        "caption": "全场合影"
+      },
+      {
+        "asset": "hefei-moments",
+        "caption": "散场之后 · 朋友圈原文"
+      }
+    ],
+    "timeline": [
+      {
+        "phase": "演出前",
+        "date": "2026-10-11",
+        "time": "19:00",
+        "emoji": "🎫",
+        "title": "准备入场",
+        "content": "抵达 Livehouse，等待开场。（示意时间）",
+        "transportJourneys": []
+      },
+      {
+        "phase": "演出前",
+        "date": "2026-10-11",
+        "time": "19:40",
+        "emoji": "🎤",
+        "title": "等待开场",
+        "content": "在场内等灯光暗下来。（示意时间）",
+        "transportJourneys": []
+      },
+      {
+        "phase": "演出中",
+        "date": "2026-10-11",
+        "time": "20:00",
+        "emoji": "🎵",
+        "title": "演出开始",
+        "content": "《幸会》合肥站正式开场。",
+        "transportJourneys": []
+      },
+      {
+        "phase": "演出中",
+        "date": "2026-10-11",
+        "time": "21:15",
+        "emoji": "✨",
+        "title": "彩带与现场",
+        "content": "把这一刻留在手翻书里。（示意时间）",
+        "transportJourneys": [],
+        "image": "hefei-stage"
+      },
+      {
+        "phase": "演出后",
+        "date": "2026-10-11",
+        "time": "21:30",
+        "emoji": "📷",
+        "title": "演出结束",
+        "content": "这一晚的现场和合影。LIVE FOR TODAY",
+        "transportJourneys": [],
+        "image": "hefei-group"
+      },
+      {
+        "phase": "演出后",
+        "date": "2026-10-11",
+        "time": "22:00",
+        "emoji": "📝",
+        "title": "散场之后",
+        "content": "想把你留在这里。朋友圈随记收录于 Personal Note。（示意时间）",
+        "transportJourneys": [],
+        "image": "hefei-group"
+      }
+    ],
     "id": "jonyj-hefei",
     "title": "《幸会》巡演 · 合肥站",
     "artist": "Jony J",
@@ -33,7 +104,8 @@
     "date": "2026-10-11",
     "venue": "葫芦果 CHIZHAO LIVEHOUSE",
     "type": "livehouse",
-    "cover": "covers0",
-    "tour": "幸会"
+    "cover": "hefei-stage",
+    "tour": "幸会",
+    "endTime": "21:30"
   }
 ]
