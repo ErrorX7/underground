@@ -34,6 +34,46 @@ export function bracket(session) {
   return {rounds, next, champion: previous[0]};
 }
 
+const coolaSongs = [
+  "囚牢",
+  "凌晨",
+  "带刺",
+  "走出荒野",
+  "灯火",
+  "别害怕",
+  "明日再 E",
+  "I Deserve",
+  "24 下半",
+  "What U Want",
+  "普通",
+  "No Service",
+  "冷气",
+  "Go ahead",
+  "Still in love",
+  "脚本",
+  "To Be",
+  "Luv Hipa",
+  "New life",
+  "谁的错",
+  "完美男友",
+  "马子狗",
+  "选择题",
+  "晨夕航线",
+  "8 Hours",
+  "飞蚊症 Intro",
+  "鹰",
+  "Patience",
+  "画笔",
+  "青草地",
+  "西西弗斯",
+  "Light In The Darkness",
+  "On My Way",
+  "GOOD NEWS",
+  "Like I Ain‘t",
+  "BKStore Cypher",
+  "给爸妈但没写完的歌",
+];
+
 export function setupHall({records, names, esc, repertoire, render}) {
   const key = 'underground-personal-hall-v1';
   const initial = () => ({
@@ -48,6 +88,13 @@ export function setupHall({records, names, esc, repertoire, render}) {
   let hiddenShows = new Set();
   let replacing = false;
   let storageWarning = '';
+  const coola = state.artists.find(person => person.name.toLowerCase() === 'coola');
+  if (coola && !coola.importedPlaylist) {
+    const existing = (coola.songs || '').split(/\r?\n/).map(song => song.trim()).filter(Boolean);
+    coola.songs = [...new Set([...coolaSongs, ...existing])].join('\n');
+    coola.importedPlaylist = true;
+    save();
+  }
   function enterBattle() {
     mode = 'songs';
     hiddenShows.clear();
