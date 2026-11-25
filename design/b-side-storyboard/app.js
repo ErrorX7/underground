@@ -1,3 +1,4 @@
+import {setupHall} from './hall.js';
 const shots = {
   door: ['地下入口','狗 DJ 抬爪落针','黑白闪光灯照亮粗毛小狗。桌面比狗的脸更靠近镜头，后墙只亮一截红色灯管。','点狗或「落针进场」。前爪往回擦碟两下，电平跳起。声音由访客打开，同一标签页再次进入默认去唱片墙。','约 0.9 秒。盘面从俯视的椭圆收成圆形，落到唱片墙第一只 CD 盒的右侧。'],
   wall: ['唱片墙','从架子上抽一张','《飞蚊症》装进透明 CD 盒。点「演出票根」，杭州和合肥两场分别印成带撕线的票。','点 CD 看收藏理由和关联现场。票根可按年份、艺人分组，点票面或票副都能进入详情。','从一张专辑翻到关联演出，或从带城市和月日的票副直接入场。'],
@@ -6,7 +7,7 @@ const shots = {
   entry: ['新建 / 编辑演出','印一张演出票根','表单用纸白底。封面预览随输入变成一张标签，票价、购票方式等次要资料归在折叠区。','上传封面、填写场次后保存。本次审稿的表单只修改这次打开的示例。','保存后在详情页看到刚填的封面和文字，减少从头找场次的动作。'],
   edit: ['时间线编辑','把一段路夹进节点','节点沿竖线排开。记录文字下面是行程卡，再往下贴照片。车次或航班号像票面印字。','点节点修改时间、阶段或文字。可添加多段行程和照片，保存后去折页看到变化。','展开行程像抽出票夹。桌面左右分栏，手机先选节点再编辑。'],
   map: ['地图记忆','按城市翻找现场','沿用中国地图和城市记录，右侧像车站到发板。切换年份看那一年的场次。','点城市或站牌看该城记录，再点场名回到详情。「足迹」连接按日期排列的演出城市。','选站时目的地文字替换、站点亮起。真实乘车或航班信息仍取自该场的行程卡。'],
-  hall: ['名人堂 / 里程碑','散场后的后台走廊','黑底名单像后台门上的名牌。左侧红色握麦近景借用 battle 传麦的意象。','点艺人，展开专辑、巡演与亲历场次。Coola 的作品卡通向原互动站。底部纪念章取自记录里的第一场、第一场 Livehouse 等。','点纪念章直接回到那晚的详情。让每个章都能翻到具体的一页。']
+  hall: ['名人堂 / 里程碑','散场后的后台走廊','黑底艺人榜旁是当前艺人的候选歌单。对决窗口中，两面候选卡映出你的选择。','添加艺人，用上下箭头排位。填歌单或勾选演出，两两选择，每一票生成晋级树的一条分支。','点纪念章直接回到那晚的详情。让每个章都能翻到具体的一页。']
 };
 const keys=Object.keys(shots), phases=['演出前','演出中','演出后'];
 const $=selector=>document.querySelector(selector);
@@ -78,7 +79,7 @@ function render(){
 }
 function showDrawer(notes=false){const n=shots[current];$('#drawer-body').innerHTML=notes?
   '<h2 id="drawer-title">'+num()+' · '+n[0]+'</h2>'+['画面','试一试','衔接'].map((label,i)=>'<div class="noteitem"><b>'+label+'</b><p>'+n[i+2]+'</p></div>').join('')+'<button class="outline" data-index>全部分镜</button>':
-  '<h2 id="drawer-title">分镜目录</h2>'+keys.map((k,i)=>'<button class="storyrow '+(current===k?'active':'')+'" data-go="'+k+'"><span class="mono">'+pad(i+1)+'</span><b>'+shots[k][0]+'</b><span>↗</span></button>').join('')+'<p class="readhint">审稿原型 · 已收录 Coola 杭州、Jony J 合肥。预览中的编辑只在本次打开时有效。</p>';
+  '<h2 id="drawer-title">分镜目录</h2>'+keys.map((k,i)=>'<button class="storyrow '+(current===k?'active':'')+'" data-go="'+k+'"><span class="mono">'+pad(i+1)+'</span><b>'+shots[k][0]+'</b><span>↗</span></button>').join('')+'<p class="readhint">审稿原型 · 已收录 Coola 杭州、Jony J 合肥。名人堂保存在本浏览器；演出资料的试改仅在本次打开时有效。</p>';
   if(!dialog.open)dialog.showModal();
 }
 function doorScreen(){return '<section class="door"><div class="doorMain"><div class="doorCopy">'+tag('B1 / LIVEHOUSE 入口')+'<h1 lang="en"><span>NEEDLE</span><span>DROP<b>.</b></span></h1><h2>地下演出档案馆</h2><div class="actions"><button class="btn hot press" data-start>▶　落针进场</button><button class="quiet" data-skip>跳过开场</button></div></div><button class="artplate" data-start aria-label="点狗 DJ 开始打碟并进入唱片墙"><span class="djpic"></span><span class="platterFx"></span><span class="djpaw"></span><span class="plateid">BOOTH CAM / B1</span><span class="playdot" aria-hidden="true">▶</span><span class="meter">'+[6,9,15,22,17,11,16,8].map((h,i)=>'<b style="--h:'+h+'px;--d:-'+i*.022+'s"></b>').join('')+'</span></button></div><div class="doorfoot"><span class="mono">地下入口　/　01</span><button class="sound" data-sound aria-pressed="'+sound+'">声音 <span>'+ (sound?'开':'关')+'</span></button></div></section>'}
@@ -173,7 +174,8 @@ function repertoire(name){
  const tours=[...new Set(works.map(r=>r.tour).filter(Boolean))];
  return '<div class="repertoire">'+albums.map(a=>'<button class="hallalbum" data-album="'+a.id+'"><img src="'+a.cover+'" alt=""><span>收藏专辑<br><b>《'+escape(a.title)+'》 ↗</b></span></button>').join('')+tours.map(t=>'<div><small>巡演</small><b>《'+escape(t)+'》</b></div>').join('')+(works.some(r=>r.album==='飞蚊症')?'<a href="'+coolaSite+'" target="_blank" rel="noopener">进入《飞蚊症》互动音乐网站 ↗</a>':'')+'<small>我看过的场次</small>'+works.map(r=>recButton(r)).join('')+'</div>';
 }
-function hallScreen(){const names=[...new Set([...collection.map(a=>a.artist),...records.map(r=>r.artist)].filter(Boolean))];if(artist&&!names.includes(artist))artist=names[0];const chron=records.slice().sort((a,b)=>a.date.localeCompare(b.date));const milestones=[['档案首场',chron[0]],['最早收录的 Livehouse',chron.find(r=>r.type==='livehouse')],['最早收录的跨城行程',chron.find(r=>r.timeline.some(n=>n.transportJourneys?.some(j=>j.from&&j.to&&j.from!==j.to)))]];return section(tag('BACKSTAGE / 艺人名册')+title('我的名人堂')+'<div class="hallgrid"><div class="hallpic"><img src="'+art('mic')+'" alt="递向舞台的一支麦克风"><b>PASS<br>THE MIC.</b></div><div>'+names.map((a,i)=>'<button class="artistrow '+(a===artist?'on':'')+'" data-artist="'+escape(a)+'" aria-expanded="'+(a===artist)+'"><span class="mono">'+pad(i+1)+'</span><b>'+escape(a)+'</b><span>↗</span></button>'+(a===artist?repertoire(a):'')).join('')+'</div></div><div class="milestones">'+milestones.filter(([,r])=>r).map(([l,r])=>'<button class="ms" data-record="'+escape(r.id)+'"><span>'+escape(r.date)+'</span><strong>'+l+'</strong>'+escape(r.city)+' ↗</button>').join('')+'</div>','dark')}
+const personalHall = setupHall({records, names:[...new Set([...collection.map(a=>a.artist),...records.map(r=>r.artist)])],esc:escape,repertoire,render});
+function hallScreen(){const chron=records.slice().sort((a,b)=>a.date.localeCompare(b.date));const milestones=[['档案首场',chron[0]],['最早收录的 Livehouse',chron.find(r=>r.type==='livehouse')],['最早收录的跨城行程',chron.find(r=>r.timeline.some(n=>n.transportJourneys?.some(j=>j.from&&j.to&&j.from!==j.to)))]];return section(tag('BACKSTAGE / 艺人名册')+title('我的名人堂')+personalHall()+'<div class="milestones">'+milestones.filter(([,r])=>r).map(([l,r])=>'<button class="ms" data-record="'+escape(r.id)+'"><span>'+escape(r.date)+'</span><strong>'+l+'</strong>'+escape(r.city)+' ↗</button>').join('')+'</div>','dark')}
 function chooseRecord(id){wallMode='list';const r=records.find(v=>v.id===id);if(!r)return;selectedId=id;navigate('detail')}
 function moveShot(dir){const next=keys[keys.indexOf(current)+dir];if(next)navigate(next)}
 function saveForm(form){const data=Object.fromEntries(new FormData(form));for(const k of ['title','artist','city','venue']){data[k]=String(data[k]||'').trim();if(!data[k]){form.elements[k].focus();return}}data.price=data.price===''?null:Number(data.price);data.actualPrice=data.actualPrice?Number(data.actualPrice):undefined;
