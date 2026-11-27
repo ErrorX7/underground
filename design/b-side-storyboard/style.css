@@ -31,3 +31,17 @@ dialog{color:var(--ink);width:min(580px,calc(100vw - 26px));max-height:82svh;bor
 .album-wall-group{margin:24px 0 42px}.album-wall-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:22px}.album-wall-heading h2{font-size:20px;margin:0}.album-wall-heading .mono{color:#78756c}.album-wall-group .albumrack{grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:26px}.album-wall-group .casebtn{max-width:275px;width:100%}.album-wall-group .albumart{background-size:contain;background-repeat:no-repeat;background-position:center;background-color:#e6dfd1}@media(max-width:620px){.album-wall-group .albumrack{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}.album-wall-group .casebtn{max-width:none}.album-wall-heading h2{font-size:17px}}
 
 #local-storage-status{font-size:12px;margin-left:auto}#local-storage-status.failed{color:#ffad98;font-weight:bold}.site-footer{gap:14px;flex-wrap:wrap}
+
+.albumrack{align-items:start}
+.albumrack .casebtn{display:flex;flex-direction:column;align-items:stretch;align-self:start}
+.albumrack .jewel{width:100%;flex-shrink:0}
+.albumrack .albumart{inset:auto;top:5%;left:6%;height:90%;width:auto;aspect-ratio:1;padding:0;background-size:cover}
+.albumart:before{display:none}
+.albumrack .rackfoot{display:block;width:100%;padding:12px 0 9px}
+.albumrack .rackfoot strong{display:block;font-size:clamp(16px,1.6vw,22px);line-height:1.35}
+.albumrack .rackfoot .mono{display:block;margin-top:5px;font-size:10px}
+.album-intro{margin:14px 0 18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.album-intro summary{padding:11px 0;cursor:pointer;font-weight:700;font-size:13px}
+.album-intro p{white-space:pre-wrap;line-height:1.8;font-size:14px;padding:0 0 12px;max-height:45svh;overflow:auto}
+.albumleaf{align-items:start}
+@media(max-width:620px){.albumleaf{grid-template-columns:1fr}.albumleaf img{width:min(100%,240px);margin:auto}.albumrack .rackfoot strong{font-size:15px}.albumrack .rackfoot .mono{font-size:9px}}
