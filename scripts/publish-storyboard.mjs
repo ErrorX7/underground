@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 
 const source = resolve("design/b-side-storyboard");
 const out = resolve("out");
-const files = ["index.html", "style.css", "app.js", "hall.js", "records.json", "map.json", "MAP_DATA_ATTRIBUTION.md"];
+const files = ["index.html", "style.css", "app.js", "hall.js", "storage.js", "records.json", "map.json", "MAP_DATA_ATTRIBUTION.md"];
 if (!existsSync(resolve(out, "archive/index.html"))) throw new Error("Legacy archive export is missing");
 for (const name of files) {
   const path = resolve(source, name);

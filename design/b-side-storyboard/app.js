@@ -1,3 +1,4 @@
+import {loadRecords,saveRecord,storePhoto} from './storage.js';
 import {setupHall} from './hall.js';
 const shots = {
   door: ['地下入口','狗 DJ 抬爪落针','黑白闪光灯照亮粗毛小狗。桌面比狗的脸更靠近镜头，后墙只亮一截红色灯管。','点狗或「落针进场」。前爪往回擦碟两下，电平跳起。声音由访客打开，同一标签页再次进入默认去唱片墙。','约 0.9 秒。盘面从俯视的椭圆收成圆形，落到唱片墙第一只 CD 盒的右侧。'],
@@ -22,17 +23,33 @@ const coolaSite='https://errorx7.github.io/c2ola-floaters/';
 const albumCover=coolaSite+'cover.webp';
 const sourceArt=['mic','crowd','train','crowd','after','mic'];
 const selector=document.querySelector('#scene'), dialog=$('#drawer');
-const [records,geo]=await Promise.all(['records.json','map.json'].map(async path=>{const r=await fetch(path);if(!r.ok)throw Error(path);return r.json()}));
+const [seedRecords,geo]=await Promise.all(['records.json','map.json'].map(async path=>{const r=await fetch(path);if(!r.ok)throw Error(path);return r.json()}));
 const photoKeys=['hefei-stage','hefei-group','hefei-moments'];
 const availablePhotos=new Set((await Promise.all(photoKeys.map(async key=>{try{const res=await fetch(art(key),{method:'HEAD'});return res.ok&&res.headers.get('content-type')?.startsWith('image/')?key:null}catch{return null}}))).filter(Boolean));
-for(const record of records){if(photoKeys.includes(record.cover)&&!availablePhotos.has(record.cover))record.cover='covers0';for(const node of record.timeline||[]){if(photoKeys.includes(node.image)&&!availablePhotos.has(node.image))delete node.image}}
+let records, storageReady=true, imageJobs=0, saving=false;
+function storageStatus(message,failed=false){
+ const el=$('#local-storage-status');el.textContent=message;el.classList.toggle('failed',failed);
+}
+try { records=await loadRecords(seedRecords); }
+catch { records=seedRecords;storageReady=false;storageStatus('无法读取本机存档，请刷新重试。',true); }
+async function persist(record){
+ if(!storageReady){storageStatus('本机存档尚未读取成功，请刷新后重试。',true);return false;}
+ storageStatus('正在保存到本机…');
+ try{await saveRecord(record);storageStatus('已保存到本机');return true;}
+ catch{storageStatus('保存失败，请保留当前页面后重试，并检查设备可用空间。',true);return false;}
+}
+function imageUrl(value){return /^(data:image\/|blob:|https?:\/\/)/.test(value||'');}
+function updateSaveButtons(){
+ document.querySelectorAll('#entry-form button[type="submit"],[data-save-time],#stamp-date,input[type="file"]').forEach(b=>{b.disabled=imageJobs>0||saving||!storageReady;});
+}
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let current='', selectedId=records[0].id, filter='all',query='', bookSide='closed',sound=false, entering=false,year='all',city='杭州',route=false,artist=records[0].artist,entryMode='new',entryCover='',timelineDraft=[],nodeIndex=0,entryDraft=null;
 let releaseTimer=0;
 let listGroup='year', wallMode='shelf';
+try{wallMode=localStorage.getItem('underground-wall-tab')==='list'?'list':'shelf';}catch{}
 const rec=()=>records.find(r=>r.id===selectedId)||records[0];
-const coverOf=r=>r.cover==='album'?albumCover:r.cover==='hefei-stage'?art(r.cover):r.cover?.startsWith('blob:')?r.cover:art(sourceArt[Number(r.cover?.replace('covers',''))]||'mic');
-const phaseArt=item=>['hefei-stage','hefei-group'].includes(item?.image)?art(item.image):item?.image?.startsWith('blob:')?item.image:art(['train','crowd','after'][phases.indexOf(item?.phase)]||'crowd');
+const coverOf=r=>r.cover==='album'?albumCover:photoKeys.includes(r.cover)&&availablePhotos.has(r.cover)?art(r.cover):imageUrl(r.cover)?r.cover:art(sourceArt[Number(r.cover?.replace('covers',''))]||'mic');
+const phaseArt=item=>photoKeys.includes(item?.image)&&availablePhotos.has(item.image)?art(item.image):imageUrl(item?.image)?item.image:art(['train','crowd','after'][phases.indexOf(item?.phase)]||'crowd');
 const tag=(s)=>'<div class="kicker">'+s+'</div>';
 const title=(t)=>'<h1 class="title">'+escape(t)+'</h1>';
 const section=(body,cls='')=>'<section class="page '+cls+'">'+body+'</section>';
@@ -40,12 +57,20 @@ const back=(page,text)=>'<button class="back" data-go="'+page+'">← '+text+'</b
 const button=(label,page,cls='outline')=>'<button class="'+cls+'" data-go="'+page+'">'+label+'</button>';
 const num=()=>pad(keys.indexOf(current)+1);
 const recButton=(r,label)=>'<button data-record="'+escape(r.id)+'">'+(label||escape(r.title)+' ↗')+'</button>';
-function routeHash(key,id=selectedId){return '#'+key+(['detail','book','edit'].includes(key)?'/'+encodeURIComponent(id):'')}
-function readRoute(){const [key,raw]=location.hash.slice(1).split('/');if(raw){try{const id=decodeURIComponent(raw);if(records.some(r=>r.id===id))selectedId=id}catch{}}if(keys.includes(key))return key;try{return sessionStorage.getItem('ug-review-entered')?'wall':'door'}catch{return 'door'}}
+function routeHash(key,id=selectedId){return '#'+key+(key==='wall'?'/'+wallMode:['detail','book','edit'].includes(key)?'/'+encodeURIComponent(id):'')}
+function readRoute(){
+ let hash=location.hash.slice(1);
+ if(!hash){try{hash=localStorage.getItem('underground-last-page')||'';}catch{}}
+ const [key,raw]=hash.replace(/^#/, '').split('/');
+ if(key==='wall'&&['list','shelf'].includes(raw))wallMode=raw;
+ else if(raw){try{const id=decodeURIComponent(raw);if(records.some(r=>r.id===id))selectedId=id;}catch{}}
+ if(keys.includes(key))return key;
+ return 'door';
+}
 function loadScreen(key){
   current=key;if(key==='battle')personalHall.enterBattle();if(key==='book')bookSide='closed';
   if(key==='edit'){timelineDraft=structuredClone(rec().timeline);nodeIndex=0}
-  if(key==='entry'){entryDraft=entryMode==='edit'?structuredClone(rec()):{title:'',artist:'',guest:'',date:'',time:'',city:'',venue:'',type:'livehouse',price:'',line:'',ticketMethod:'',ticketSource:'',actualPrice:''};entryCover=entryMode==='edit'&&rec().cover?.startsWith('blob:')?rec().cover:''}
+  if(key==='entry'){entryDraft=entryMode==='edit'?structuredClone(rec()):{title:'',artist:'',guest:'',date:'',time:'',city:'',venue:'',type:'livehouse',price:'',line:'',ticketMethod:'',ticketSource:'',actualPrice:''};entryCover=entryMode==='edit'&&imageUrl(rec().cover)?rec().cover:''}
   render();window.scrollTo({top:0,behavior:'instant'});selector.focus({preventScroll:true});
 }
 function sharedObjects(key){
@@ -78,6 +103,11 @@ function render(){
   selector.innerHTML=({door:doorScreen,wall:wallScreen,detail:detailScreen,book:bookScreen,entry:entryScreen,edit:editScreen,map:mapScreen,hall:hallScreen,battle:battleScreen})[current]();
 
   document.querySelectorAll('header nav button').forEach(b=>{if((b.dataset.go===current||(b.dataset.go==='wall'&&['detail','book','entry','edit'].includes(current))||(b.dataset.go==='hall'&&current==='battle'))&&(!b.dataset.wallTab||b.dataset.wallTab===(current==='wall'?wallMode:'list')))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  updateSaveButtons();
+  try{
+   if(current==='wall')localStorage.setItem('underground-wall-tab',wallMode);
+   if(!['entry','edit','door'].includes(current))localStorage.setItem('underground-last-page',routeHash(current));
+  }catch{}
   document.title=(current==='wall'?(wallMode==='shelf'?'唱片架':'演出档案'):shots[current][0])+' · UNDERGROUND';
 }
 
@@ -150,7 +180,7 @@ function wallScreen(){
  const filters='<div class="walltools"><div class="chips">'+Object.entries({all:'全部',...types}).map(([k,v])=>switchButton('filter',k,v,filter)).join('')+'</div><input class="search" id="search" placeholder="搜索演出、艺人或城市" aria-label="搜索演出、艺人或城市" value="'+escape(query)+'"></div>';
  return section(header+tabs+filters+group+'<div class="showlist" id="rack">'+showList()+'</div>');
 }
-function journey(j){return '<details><summary>'+escape(modes[j.mode]||'行程')+'　'+escape(j.from||'出发地')+' → '+escape(j.to||'目的地')+'</summary><div class="ticketbox">'+escape([j.serviceNumber,j.departureDate,j.departureTime,'→',j.arrivalDate,j.arrivalTime].filter(Boolean).join(' '))+(j.ticketImage?.startsWith('blob:')?'<img class="thumb" src="'+escape(j.ticketImage)+'" alt="车票或机票">':'')+'</div></details>'}
+function journey(j){return '<details><summary>'+escape(modes[j.mode]||'行程')+'　'+escape(j.from||'出发地')+' → '+escape(j.to||'目的地')+'</summary><div class="ticketbox">'+escape([j.serviceNumber,j.departureDate,j.departureTime,'→',j.arrivalDate,j.arrivalTime].filter(Boolean).join(' '))+(imageUrl(j.ticketImage)?'<img class="thumb" src="'+escape(j.ticketImage)+'" alt="车票或机票">':'')+'</div></details>'}
 function recordGallery(r){const photos=(r.media||[]).filter(m=>availablePhotos.has(m.asset));return photos.length?'<section class="record-gallery"><div>'+tag('CONTACT SHEET / 现场留影')+'<h2>这一晚的照片</h2></div><div class="record-gallery-grid">'+photos.map(m=>'<figure><a href="'+art(m.asset)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+art(m.asset)+'" alt="'+escape(m.caption)+'"></a><figcaption>'+escape(m.caption)+'</figcaption></figure>').join('')+'</div></section>':''}
 function detailScreen(){const r=rec();return section(back('wall','演出票根')+tag('LINER NOTES / 演出详情')+'<div class="detailTop"><div class="detailart"><img src="'+coverOf(r)+'" alt="演出封面"></div><div class="detailCopy"><span class="type">'+escape(r.date)+' / '+escape(types[r.type])+'</span>'+title(r.title)+'<p>'+escape(r.artist)+'　·　'+escape(r.city)+'</p><p class="sub">'+escape(r.venue)+'　'+escape(r.time)+(r.endTime?'—'+escape(r.endTime):'')+(r.price==null?'':'　/　¥'+escape(r.price))+'</p><div class="actions">'+button('翻开折页 ↗','book','btn hot')+'<button class="outline" data-edit-info>编辑资料</button></div></div></div><div class="personal"><div><div class="mono red">PERSONAL NOTE</div><h2>这一晚，我想记住</h2></div><p>'+escape(r.note||r.line||'还没有写下这场随记。')+'</p></div>'+recordGallery(r)+entrySouvenirs(r)+'<div class="timeline"><div class="rowhead"><h2>演出时间线</h2>'+button('编辑时间线','edit')+'</div>'+r.timeline.map(i=>'<article class="event"><time>'+escape(i.time||'—')+'</time><div class="eventinc"><span>'+escape(i.date||r.date)+' / '+escape(i.phase)+'</span><h3>'+escape(i.emoji)+' '+escape(i.title)+'</h3><p class="sub">'+escape(i.content)+'</p>'+(i.image?'<img class="thumb" src="'+phaseArt(i)+'" alt="'+escape(i.title)+'照片">':'')+(i.transportJourneys||[]).map(journey).join('')+'</div></article>').join('')+'</div>')}
 function bookScreen(){const r=rec(),before=r.timeline.find(i=>i.phase===phases[0]),mid=r.timeline.find(i=>i.phase===phases[1]&&i.image)||r.timeline.find(i=>i.phase===phases[1]),end=r.timeline.filter(i=>i.phase===phases[2]).at(-1),opened=bookSide==='open',reverse=bookSide==='reverse',i=records.indexOf(r);
@@ -161,10 +191,10 @@ function updateBook(side){const was=bookSide;bookSide=side;if((was==='closed'&&s
 function turn(dir){const i=records.indexOf(rec())+dir;if(i<0||i>=records.length)return;selectedId=records[i].id;bookSide='closed';history.replaceState(null,'',routeHash('book'));render();if(!reduced()){const el=document.createElement('div');el.className='pageTurn';if(dir<0){el.style.inset='0 50% 0 0';el.style.transformOrigin='right';el.style.animationDirection='reverse'}$('.book').append(el);el.addEventListener('animationend',()=>el.remove())}$('#announce').textContent=rec().title}
 function field(label,key,value,type='text',required=false){return '<label>'+label+'<input type="'+type+'" name="'+key+'" value="'+escape(value)+'" '+(required?'required':'')+(type==='number'?' min="0" step="0.01"':'')+'></label>'}
 function options(obj,v){return Object.entries(obj).map(([k,n])=>'<option value="'+escape(k)+'" '+(v===k?'selected':'')+'>'+escape(n)+'</option>').join('')}
-function entryScreen(){const r=entryDraft,heading=entryMode==='edit'?'编辑演出资料':'新建演出记录';return section(back(entryMode==='edit'?'detail':'wall','返回')+tag('LABEL PRESS / 档案内页')+title(heading)+'<form id="entry-form" class="formgrid"><div class="formbox">'+field('演出名称','title',r.title,'text',true)+field('艺人','artist',r.artist,'text',true)+field('嘉宾','guest',r.guest)+field('关联专辑','album',r.album)+field('巡演名称','tour',r.tour)+field('日期','date',r.date,'date',true)+field('时间','time',r.time,'time')+field('城市','city',r.city,'text',true)+field('场馆','venue',r.venue,'text',true)+'<label>演出类型<select name="type">'+options(types,r.type)+'</select></label><details class="wide"><summary>票务资料</summary><div class="formbox">'+field('票面价','price',r.price,'number')+field('实付价','actualPrice',r.actualPrice,'number')+'<label>购票方式<select name="ticketMethod">'+options({'':'未填写',official:'官方购票',proxy:'代拍',resale:'二手转票',scalper:'黄牛收票',gift:'赠票',other:'其他'},r.ticketMethod)+'</select></label>'+field('票源','ticketSource',r.ticketSource)+'</div></details><label class="wide">一句话记录<textarea name="line">'+escape(r.line)+'</textarea></label><label class="wide">Personal Note<textarea name="note">'+escape(r.note||'')+'</textarea></label><label class="wide filelabel">封面图片<input type="file" accept="image/*" id="entry-image"></label><div class="actions wide"><button class="btn" type="submit">保存本次修改 ↗</button><span class="readhint">当前修改仅在本次打开期间有效；长期保存请使用旧版档案</span></div></div><aside class="sideprint"><div class="formcover"><img id="form-photo" src="'+(entryCover||(entryMode==='edit'?coverOf(rec()):art('mic'))) +'" alt="封面预览"></div><h2 id="form-title">'+escape(r.title||'新演出票根')+'</h2><span id="form-caption" class="sub">'+escape([r.artist,r.city].filter(Boolean).join(' / '))+'</span></aside></form>')}
+function entryScreen(){const r=entryDraft,heading=entryMode==='edit'?'编辑演出资料':'新建演出记录';return section(back(entryMode==='edit'?'detail':'wall','返回')+tag('LABEL PRESS / 档案内页')+title(heading)+'<form id="entry-form" class="formgrid"><div class="formbox">'+field('演出名称','title',r.title,'text',true)+field('艺人','artist',r.artist,'text',true)+field('嘉宾','guest',r.guest)+field('关联专辑','album',r.album)+field('巡演名称','tour',r.tour)+field('日期','date',r.date,'date',true)+field('时间','time',r.time,'time')+field('城市','city',r.city,'text',true)+field('场馆','venue',r.venue,'text',true)+'<label>演出类型<select name="type">'+options(types,r.type)+'</select></label><details class="wide"><summary>票务资料</summary><div class="formbox">'+field('票面价','price',r.price,'number')+field('实付价','actualPrice',r.actualPrice,'number')+'<label>购票方式<select name="ticketMethod">'+options({'':'未填写',official:'官方购票',proxy:'代拍',resale:'二手转票',scalper:'黄牛收票',gift:'赠票',other:'其他'},r.ticketMethod)+'</select></label>'+field('票源','ticketSource',r.ticketSource)+'</div></details><label class="wide">一句话记录<textarea name="line">'+escape(r.line)+'</textarea></label><label class="wide">Personal Note<textarea name="note">'+escape(r.note||'')+'</textarea></label><label class="wide filelabel">封面图片<input type="file" accept="image/*" id="entry-image"></label><div class="actions wide"><button class="btn" type="submit">保存到本机 ↗</button><span class="readhint">保存在当前设备、当前浏览器</span></div></div><aside class="sideprint"><div class="formcover"><img id="form-photo" src="'+(entryCover||(entryMode==='edit'?coverOf(rec()):art('mic'))) +'" alt="封面预览"></div><h2 id="form-title">'+escape(r.title||'新演出票根')+'</h2><span id="form-caption" class="sub">'+escape([r.artist,r.city].filter(Boolean).join(' / '))+'</span></aside></form>')}
 function newNode(){return {phase:phases[0],date:rec().date,time:'',emoji:'',title:'',content:'',transportJourneys:[]}}
-function tripFields(j,k){return '<details class="journeyedit" '+(!j.from?'open':'')+' data-trip="'+k+'"><summary>'+escape(modes[j.mode]||'交通')+'　'+escape(j.from||'出发地')+' → '+escape(j.to||'目的地')+'</summary><div class="formbox"><label>交通方式<select name="mode">'+options(modes,j.mode)+'</select></label>'+field('车次 / 航班号','serviceNumber',j.serviceNumber)+field('出发地','from',j.from)+field('目的地','to',j.to)+field('出发日期','departureDate',j.departureDate,'date')+field('出发时间','departureTime',j.departureTime,'time')+field('抵达日期','arrivalDate',j.arrivalDate,'date')+field('抵达时间','arrivalTime',j.arrivalTime,'time')+'<label class="filelabel wide">票据图片<input type="file" accept="image/*" data-ticket="'+k+'">'+(j.ticketImage?.startsWith('blob:')?'<img class="thumb" src="'+j.ticketImage+'" alt="票据预览">':'')+'</label></div><button class="chip" data-remove-trip="'+k+'">移除本段行程</button></details>'}
-function editScreen(){const n=timelineDraft[nodeIndex],r=rec();return section(back('detail','演出详情')+tag('SESSION LOG / 时间线')+'<div class="rowhead"><div>'+title('编辑时间线')+'<p class="sub">'+escape(r.title)+'</p></div><button class="btn" data-save-time>保存本次修改 ↗</button></div><div class="edt"><aside>'+timelineDraft.map((i,k)=>'<button class="nodepick '+(k===nodeIndex?'on':'')+'" data-node="'+k+'"><span>'+pad(k+1)+' / '+escape(i.phase)+'</span><b>'+escape(i.title||'新节点')+'</b></button>').join('')+'<button class="outline" data-add-node>＋ 节点</button></aside><div>'+(n?'<div class="formbox" id="node-fields"><label>阶段<select name="phase">'+options(Object.fromEntries(phases.map(p=>[p,p])),n.phase)+'</select></label>'+field('Emoji 标签','emoji',n.emoji)+field('日期','date',n.date||r.date,'date')+field('时间','time',n.time,'time')+'<div class="wide">'+field('标题','title',n.title)+'</div><label class="wide">记录<textarea name="content">'+escape(n.content)+'</textarea></label></div><div class="control" style="margin:15px 0 10px"><button class="outline" data-add-trip>＋ 添加交通行程</button></div>'+(n.transportJourneys||[]).map(tripFields).join('')+'<label class="filelabel" style="display:block;margin:12px 0">节点照片 <input id="node-image" type="file" accept="image/*">'+(n.image?'<img class="thumb" src="'+phaseArt(n)+'" alt="节点照片预览">':'')+'</label><button class="chip" data-remove-node>移除这个节点</button>':'<p class="empty">时间线是空的，点「＋ 节点」开始。</p>')+'</div></div>')}
+function tripFields(j,k){return '<details class="journeyedit" '+(!j.from?'open':'')+' data-trip="'+k+'"><summary>'+escape(modes[j.mode]||'交通')+'　'+escape(j.from||'出发地')+' → '+escape(j.to||'目的地')+'</summary><div class="formbox"><label>交通方式<select name="mode">'+options(modes,j.mode)+'</select></label>'+field('车次 / 航班号','serviceNumber',j.serviceNumber)+field('出发地','from',j.from)+field('目的地','to',j.to)+field('出发日期','departureDate',j.departureDate,'date')+field('出发时间','departureTime',j.departureTime,'time')+field('抵达日期','arrivalDate',j.arrivalDate,'date')+field('抵达时间','arrivalTime',j.arrivalTime,'time')+'<label class="filelabel wide">票据图片<input type="file" accept="image/*" data-ticket="'+k+'">'+(imageUrl(j.ticketImage)?'<img class="thumb" src="'+j.ticketImage+'" alt="票据预览">':'')+'</label></div><button class="chip" data-remove-trip="'+k+'">移除本段行程</button></details>'}
+function editScreen(){const n=timelineDraft[nodeIndex],r=rec();return section(back('detail','演出详情')+tag('SESSION LOG / 时间线')+'<div class="rowhead"><div>'+title('编辑时间线')+'<p class="sub">'+escape(r.title)+'</p></div><button class="btn" data-save-time>保存到本机 ↗</button></div><div class="edt"><aside>'+timelineDraft.map((i,k)=>'<button class="nodepick '+(k===nodeIndex?'on':'')+'" data-node="'+k+'"><span>'+pad(k+1)+' / '+escape(i.phase)+'</span><b>'+escape(i.title||'新节点')+'</b></button>').join('')+'<button class="outline" data-add-node>＋ 节点</button></aside><div>'+(n?'<div class="formbox" id="node-fields"><label>阶段<select name="phase">'+options(Object.fromEntries(phases.map(p=>[p,p])),n.phase)+'</select></label>'+field('Emoji 标签','emoji',n.emoji)+field('日期','date',n.date||r.date,'date')+field('时间','time',n.time,'time')+'<div class="wide">'+field('标题','title',n.title)+'</div><label class="wide">记录<textarea name="content">'+escape(n.content)+'</textarea></label></div><div class="control" style="margin:15px 0 10px"><button class="outline" data-add-trip>＋ 添加交通行程</button></div>'+(n.transportJourneys||[]).map(tripFields).join('')+'<label class="filelabel" style="display:block;margin:12px 0">节点照片 <input id="node-image" type="file" accept="image/*">'+(n.image?'<img class="thumb" src="'+phaseArt(n)+'" alt="节点照片预览">':'')+'</label><button class="chip" data-remove-node>移除这个节点</button>':'<p class="empty">时间线是空的，点「＋ 节点」开始。</p>')+'</div></div>')}
 function mapScreen(){const years=[...new Set(records.map(r=>r.date.slice(0,4)))].sort().reverse(),items=records.filter(r=>year==='all'||r.date.startsWith(year)),cities=[...new Set(items.map(r=>r.city))];if(!cities.includes(city))city=cities[0]||'';const hits=items.filter(r=>r.city===city).sort((a,b)=>a.date.localeCompare(b.date));
 const project=([x,y])=>[24+(x-72)/64*712,24+(54.5-y)/38.5*492];const position=n=>project(coords[n]).map(v=>v.toFixed(1));const locs=cities.filter(c=>coords[c]);const activeProvinces=new Set(locs.map(c=>coords[c][2]));
 const shapes=geo.map(p=>'<path d="'+p.d+'" fill="'+(activeProvinces.has(p.n)?'#c89c81':'#d9d6c8')+'" stroke="#fcfaf1" stroke-width=".85"/>').join('');
@@ -188,8 +218,21 @@ function milestonePanel(){
 }
 function chooseRecord(id){wallMode='list';const r=records.find(v=>v.id===id);if(!r)return;selectedId=id;navigate('detail')}
 
-function saveForm(form){const data=Object.fromEntries(new FormData(form));for(const k of ['title','artist','city','venue']){data[k]=String(data[k]||'').trim();if(!data[k]){form.elements[k].focus();return}}data.price=data.price===''?null:Number(data.price);data.actualPrice=data.actualPrice?Number(data.actualPrice):undefined;
-if(entryMode==='edit'){const r=rec();Object.assign(r,data);if(entryCover)r.cover=entryCover}else{const id=crypto.randomUUID();records.unshift({...data,id,cover:entryCover||'covers0',media:[],timeline:[]});selectedId=id}entryMode='new';navigate('detail')}
+async function saveForm(form){
+ if(imageJobs||saving)return;
+ const data=Object.fromEntries(new FormData(form));
+ for(const key of ['title','artist','city','venue']){data[key]=String(data[key]||'').trim();if(!data[key]){form.elements[key].focus();return;}}
+ data.price=data.price===''?null:Number(data.price);data.actualPrice=data.actualPrice===''?undefined:Number(data.actualPrice);
+ const isEdit=entryMode==='edit';
+ const record=isEdit?{...rec(),...data}:{...data,id:crypto.randomUUID(),cover:'covers0',media:[],timeline:[]};
+ if(entryCover)record.cover=entryCover;
+ saving=true;updateSaveButtons();
+ try{
+  if(!await persist(record))return;
+  if(isEdit)Object.assign(records.find(item=>item.id===record.id),record);else records.unshift(record);
+  if(current==='entry'&&document.contains(form)){selectedId=record.id;entryMode='new';navigate('detail');}
+ }finally{saving=false;updateSaveButtons();}
+}
 function handleInput(event){const t=event.target;
 if(t.id==='search'){query=t.value;$('#rack').innerHTML=showList();return}
 if(t.closest('#entry-form')&&t.name){entryDraft[t.name]=t.value;$('#form-title').textContent=entryDraft.title||'新演出票根';$('#form-caption').textContent=[entryDraft.artist,entryDraft.city].filter(Boolean).join(' / ')}
@@ -197,9 +240,34 @@ if(current==='edit'&&timelineDraft[nodeIndex]&&t.name){const trip=t.closest('[da
 if(!trip&&['title','phase'].includes(t.name)){$('.nodepick.on b').textContent=item.title||'新节点';$('.nodepick.on span').textContent=pad(nodeIndex+1)+' / '+item.phase}}
 }
 document.addEventListener('input',handleInput);
-document.addEventListener('change',e=>{const t=e.target;if(t.id==='stamp-date'){rec().stampDate=t.checked;$('.sealpanel .inkseal').outerHTML=recordStamp(rec());return}if(t.id==='year'){year=t.value;render();return}if(t.type!=='file'||!t.files?.[0])return;const file=t.files[0];if(!file.type.startsWith('image/'))return;const url=URL.createObjectURL(file);if(t.dataset.souvenir){(rec().souvenirs??={})[t.dataset.souvenir]=url;render();return}if(t.id==='entry-image'){entryCover=url;$('#form-photo').src=url}else if(t.id==='node-image'){timelineDraft[nodeIndex].image=url;render()}else if(t.hasAttribute('data-ticket')){timelineDraft[nodeIndex].transportJourneys[+t.dataset.ticket].ticketImage=url;render()}});
+document.addEventListener('change',async e=>{
+ const t=e.target;
+ if(t.id==='stamp-date'){
+  const record=rec(),value=t.checked;saving=true;updateSaveButtons();
+  try{
+   if(await persist({...record,stampDate:value}))record.stampDate=value;
+   if(current==='detail'&&rec().id===record.id){t.checked=record.stampDate!==false;$('.sealpanel .inkseal').outerHTML=recordStamp(record);}
+  }finally{saving=false;updateSaveButtons();}
+  return;
+ }
+ if(t.id==='year'){year=t.value;render();return;}
+ if(t.type!=='file'||!t.files?.[0])return;
+ const file=t.files[0];if(!file.type.startsWith('image/'))return;
+ const record=rec(),draft=entryDraft,node=timelineDraft[nodeIndex];
+ imageJobs++;updateSaveButtons();storageStatus('正在处理照片…');
+ try{
+  const image=await storePhoto(file);
+  if(t.dataset.souvenir){
+   const souvenirs={...record.souvenirs,[t.dataset.souvenir]:image};
+   if(await persist({...record,souvenirs})){record.souvenirs=souvenirs;if(current==='detail'&&rec().id===record.id)render();}
+  }else if(t.id==='entry-image'&&current==='entry'&&entryDraft===draft){entryCover=image;$('#form-photo').src=image;storageStatus('照片已就绪，点击保存到本机。');}
+  else if(t.id==='node-image'&&current==='edit'&&timelineDraft.includes(node)){node.image=image;render();storageStatus('照片已就绪，点击保存到本机。');}
+  else if(t.hasAttribute('data-ticket')&&current==='edit'&&timelineDraft.includes(node)){node.transportJourneys[Number(t.dataset.ticket)].ticketImage=image;render();storageStatus('照片已就绪，点击保存到本机。');}
+ }catch{storageStatus('照片处理失败，请重新选择 JPG、PNG 或 WebP 图片。',true);}
+ finally{imageJobs--;updateSaveButtons();}
+});
 document.addEventListener('submit',e=>{if(e.target.id==='entry-form'){e.preventDefault();saveForm(e.target)}});
-document.addEventListener('click',e=>{const b=e.target.closest('button,[data-city]');if(!b)return;const d=b.dataset;
+document.addEventListener('click',async e=>{const b=e.target.closest('button,[data-city]');if(!b)return;const d=b.dataset;
 if('start'in d){enter();return}if('skip'in d){enter(true);return}if('sound'in d){sound=!sound;render();return}
 if('go'in d){if(d.go==='wall')wallMode=d.wallTab||(b.classList.contains('back')&&['detail','entry','edit'].includes(current)?'list':'shelf');if(d.go==='entry')entryMode='new';navigate(d.go);return}if('record'in d){chooseRecord(d.record);return}
 if(b.id==='close-drawer'){dialog.close();return}
@@ -210,7 +278,12 @@ if('group'in d){listGroup=d.group;render();return}
 if('filter'in d){filter=d.filter;render();return}
 if('unfold'in d){updateBook(bookSide==='open'?'closed':'open');return}if('reverse'in d){updateBook(bookSide==='reverse'?'closed':'reverse');return}if('turn'in d){turn(Number(d.turn));return}
 if('editInfo'in d){entryMode='edit';navigate('entry');return}if('node'in d){nodeIndex=+d.node;render();return}
-if('saveTime'in d){rec().timeline=structuredClone(timelineDraft);navigate('detail');return}if('addNode'in d){timelineDraft.push(newNode());nodeIndex=timelineDraft.length-1;render();return}
+if('saveTime'in d){
+ if(imageJobs||saving)return;
+ const record=rec(),timeline=structuredClone(timelineDraft);saving=true;updateSaveButtons();
+ try{if(await persist({...record,timeline})){record.timeline=timeline;if(current==='edit'&&rec().id===record.id)navigate('detail');}}finally{saving=false;updateSaveButtons();}
+ return;
+}if('addNode'in d){timelineDraft.push(newNode());nodeIndex=timelineDraft.length-1;render();return}
 if('removeNode'in d){timelineDraft.splice(nodeIndex,1);nodeIndex=Math.max(0,Math.min(timelineDraft.length-1,nodeIndex));render();return}
 if('addTrip'in d){const n=timelineDraft[nodeIndex];(n.transportJourneys??=[]).push({id:crypto.randomUUID(),mode:'rail',from:'',to:'',departureDate:n.date||rec().date,arrivalDate:n.date||rec().date,departureTime:'',arrivalTime:''});render();return}
 if('removeTrip'in d){timelineDraft[nodeIndex].transportJourneys.splice(+d.removeTrip,1);render();return}
